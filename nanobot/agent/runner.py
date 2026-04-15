@@ -194,7 +194,7 @@ class AgentRunner:
         had_injections = False
         injection_cycles = 0
 
-        for iteration in range(spec.max_iterations):
+        for iteration in range(spec.max_iterations):                                # AgentLoop的核心设计 利用for循环代替while 循环, 
             try:
                 # Keep the persisted conversation untouched. Context governance
                 # may repair or compact historical messages for the model, but
@@ -226,7 +226,7 @@ class AgentRunner:
             raw_usage = self._usage_dict(response.usage)
             context.response = response
             context.usage = dict(raw_usage)
-            context.tool_calls = list(response.tool_calls)
+            context.tool_calls = list(response.tool_calls)                                      # 是否调用工具
             self._accumulate_usage(usage, raw_usage)
 
             if response.has_tool_calls:

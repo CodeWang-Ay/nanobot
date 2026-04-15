@@ -431,7 +431,8 @@ class AgentLoop:
 
         while self._running:
             try:
-                msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)
+                # 这是异步编程中常见的带超时的阻塞等待，目的是既能等待消息，又不会永久卡住。
+                msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)               # 拿消息进行消费，最多1s，无消息则continue 防止阻塞
             except asyncio.TimeoutError:
                 self.auto_compact.check_expired(self._schedule_background)
                 continue

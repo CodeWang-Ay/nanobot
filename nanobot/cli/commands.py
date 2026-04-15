@@ -987,7 +987,8 @@ def agent(
         if hasattr(signal, 'SIGPIPE'):
             signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
-        async def run_interactive():
+        # 1. 进行交互
+        async def run_interactive():            
             bus_task = asyncio.create_task(agent_loop.run())
             turn_done = asyncio.Event()
             turn_done.set()
@@ -1091,7 +1092,7 @@ def agent(
                         _restore_terminal()
                         console.print("\nGoodbye!")
                         break
-            finally:
+            finally:                    # 最后退出整个服务的时候执行
                 agent_loop.stop()
                 outbound_task.cancel()
                 await asyncio.gather(bus_task, outbound_task, return_exceptions=True)
