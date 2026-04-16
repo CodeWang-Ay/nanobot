@@ -29,3 +29,4 @@ The skill format and metadata structure follow OpenClaw's conventions to maintai
 | `tmux` | Remote-control tmux sessions |
 | `clawhub` | Search and install skills from ClawHub registry |
 | `skill-creator` | Create new skills |
+| `audit` | 用户交互流程综合审计，检查正确性、可观测性、安全性 |
