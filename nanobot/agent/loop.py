@@ -640,6 +640,7 @@ class AgentLoop:
             )
             logger.info("Processing system message from {}", msg.sender_id)
             key = f"{channel}:{chat_id}"
+            # 1. 获取或创建会话
             session = self.sessions.get_or_create(key)
             if self._restore_runtime_checkpoint(session):
                 self.sessions.save(session)
@@ -648,19 +649,23 @@ class AgentLoop:
 
             await self.consolidator.maybe_consolidate_by_tokens(session)
             self._set_tool_context(channel, chat_id, msg.metadata.get("message_id"))
+            # 2. 加载历史消息
             history = session.get_history(max_messages=0)
             current_role = "assistant" if msg.sender_id == "subagent" else "user"
-
+            # 3. 构建上下文（系统提示 + 历史 + 当前消息 + skills元数据）
             messages = self.context.build_messages(
                 history=history,
                 current_message=msg.content, channel=channel, chat_id=chat_id,
                 session_summary=pending,
                 current_role=current_role,
             )
+            # 4. 运行 Agent 循环（LLM ↔ 工具调用）
             final_content, _, all_msgs, _, _ = await self._run_agent_loop(
                 messages, session=session, channel=channel, chat_id=chat_id,
                 message_id=msg.metadata.get("message_id"),
             )
+            # 5. 保存会话历史
+            # 将 LLM 交互的新消息增量保存到 session 中，同时进行数据清洗和格式规范化。
             self._save_turn(session, all_msgs, 1 + len(history))
             self._clear_runtime_checkpoint(session)
             self.sessions.save(session)
