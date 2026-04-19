@@ -39,7 +39,7 @@ from nanobot.utils.helpers import image_placeholder_text, truncate_text as trunc
 from nanobot.utils.runtime import EMPTY_FINAL_RESPONSE_MESSAGE
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, PriceHistoryConfig, WebToolsConfig
+    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, PriceHistoryConfig,  PriceInternetConfig, WebToolsConfig
     from nanobot.cron.service import CronService
 
 
@@ -144,6 +144,7 @@ class AgentLoop:
         web_config: WebToolsConfig | None = None,
         exec_config: ExecToolConfig | None = None,
         price_history_config: PriceHistoryConfig | None = None,
+        price_internet_config: PriceInternetConfig | None = None,
         cron_service: CronService | None = None,
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
@@ -155,7 +156,7 @@ class AgentLoop:
         unified_session: bool = False,
         disabled_skills: list[str] | None = None,
     ):
-        from nanobot.config.schema import ExecToolConfig, PriceHistoryConfig, WebToolsConfig
+        from nanobot.config.schema import ExecToolConfig, PriceHistoryConfig, PriceInternetConfig, WebToolsConfig
 
         defaults = AgentDefaults()
         self.bus = bus
@@ -181,6 +182,7 @@ class AgentLoop:
         self.web_config = web_config or WebToolsConfig()
         self.exec_config = exec_config or ExecToolConfig()
         self.price_history_config = price_history_config or PriceHistoryConfig()
+        self.price_internet_config = price_internet_config or PriceInternetConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
         self._start_time = time.time()
@@ -293,6 +295,13 @@ class AgentLoop:
                     password=self.price_history_config.password,
                     database=self.price_history_config.database,
                     table=self.price_history_config.table,
+                )
+            )
+        if self.price_internet_config.enable:
+            from nanobot.agent.tools.price_internet import PriceInternetTool
+
+            self.tools.register(
+                PriceInternetTool(
                 )
             )
 

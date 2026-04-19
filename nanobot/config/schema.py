@@ -199,6 +199,12 @@ class PriceHistoryConfig(Base):
     table: str = "price_history"
 
 
+class PriceInternetConfig(Base):
+    """Price history query tool configuration."""
+    enable: bool = True  # 默认禁用，需要配置数据库连接后启用
+
+
+
 class MCPServerConfig(Base):
     """MCP server connection configuration (stdio or HTTP)."""
 
