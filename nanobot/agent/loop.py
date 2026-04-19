@@ -39,7 +39,7 @@ from nanobot.utils.helpers import image_placeholder_text, truncate_text as trunc
 from nanobot.utils.runtime import EMPTY_FINAL_RESPONSE_MESSAGE
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, WebToolsConfig
+    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, PriceHistoryConfig, WebToolsConfig
     from nanobot.cron.service import CronService
 
 
@@ -143,6 +143,7 @@ class AgentLoop:
         provider_retry_mode: str = "standard",
         web_config: WebToolsConfig | None = None,
         exec_config: ExecToolConfig | None = None,
+        price_history_config: PriceHistoryConfig | None = None,
         cron_service: CronService | None = None,
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
@@ -154,7 +155,7 @@ class AgentLoop:
         unified_session: bool = False,
         disabled_skills: list[str] | None = None,
     ):
-        from nanobot.config.schema import ExecToolConfig, WebToolsConfig
+        from nanobot.config.schema import ExecToolConfig, PriceHistoryConfig, WebToolsConfig
 
         defaults = AgentDefaults()
         self.bus = bus
@@ -179,6 +180,7 @@ class AgentLoop:
         self.provider_retry_mode = provider_retry_mode
         self.web_config = web_config or WebToolsConfig()
         self.exec_config = exec_config or ExecToolConfig()
+        self.price_history_config = price_history_config or PriceHistoryConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
         self._start_time = time.time()
@@ -279,6 +281,19 @@ class AgentLoop:
         if self.cron_service:
             self.tools.register(
                 CronTool(self.cron_service, default_timezone=self.context.timezone or "UTC")
+            )
+        if self.price_history_config.enable:
+            from nanobot.agent.tools.price_history import PriceHistoryTool
+
+            self.tools.register(
+                PriceHistoryTool(
+                    host=self.price_history_config.host,
+                    port=self.price_history_config.port,
+                    user=self.price_history_config.user,
+                    password=self.price_history_config.password,
+                    database=self.price_history_config.database,
+                    table=self.price_history_config.table,
+                )
             )
 
     async def _connect_mcp(self) -> None:
@@ -431,7 +446,7 @@ class AgentLoop:
 
         while self._running:
             try:
-                # 这是异步编程中常见的带超时的阻塞等待，目的是既能等待消息，又不会永久卡住。
+                # 
                 msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)               # 拿消息进行消费，最多1s，无消息则continue 防止阻塞
             except asyncio.TimeoutError:
                 self.auto_compact.check_expired(self._schedule_background)

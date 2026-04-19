@@ -51,6 +51,7 @@ dependencies = [
     "jinja2>=3.1.0,<4.0.0",
     "dulwich>=0.22.0,<1.0.0",
     "filelock>=3.25.2",
+    "aiomysql>=0.3.2",
 ]
 
 [project.optional-dependencies]
@@ -75,6 +76,9 @@ discord = [
 ]
 langsmith = [
     "langsmith>=0.1.0",
+]
+mysql = [
+    "aiomysql>=0.2.0,<1.0.0",
 ]
 pdf = [
     "pymupdf>=1.25.0",

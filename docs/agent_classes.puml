@@ -1,0 +1,195 @@
+@startuml AgentLoop Architecture
+
+!define COMPONENT_COLOR #E8F5E9
+!define SERVICE_COLOR #FFF3E0
+!define DATA_COLOR #E3F2FD
+
+title AgentLoop 核心类关系图
+
+''' 组件定义 '''
+
+class AgentLoop << (C,COMPONENT_COLOR) Component >> {
+    ' 核心协调引擎
+    --
+    ' 持有的组件
+    - context : ContextBuilder
+    - tools : ToolRegistry
+    - runner : AgentRunner∂
+    - sessions : SessionManager
+    - consolidator : Consolidator
+    - dream : Dream
+    - subagents : SubagentManager
+    --
+    ' 外部依赖
+    + bus : MessageBus
+    + provider : LLMProvider
+    + workspace : Path
+    + model : str
+    --
+    ' 核心方法
+    + run() : void
+    + _dispatch(msg) : void
+    + _run_agent_loop(...) : tuple
+    + _register_default_tools() : void
+}
+
+class ContextBuilder << (C,COMPONENT_COLOR) Component >> {
+    ' 构建 Agent 上下文
+    --
+    ' 持有的组件
+    - memory : MemoryStore
+    - skills : SkillsLoader
+    --
+    ' 配置
+    + workspace : Path
+    + timezone : str
+    --
+    ' 核心方法
+    + build_system_prompt() : str
+    + build_messages(history, message, ...) : list
+    + add_tool_result(messages, ...) : list
+    + add_assistant_message(messages, ...) : list
+}
+
+class AgentRunner << (S,SERVICE_COLOR) Service >> {
+    ' 执行 LLM + 工具循环
+    --
+    ' 外部依赖
+    + provider : LLMProvider
+    --
+    ' 核心方法
+    + run(spec : AgentRunSpec) : AgentRunResult
+    + _execute_tools(...) : tuple
+    + _run_tool(...) : tuple
+    + _request_model(...) : Response
+}
+
+class ToolRegistry << (D,DATA_COLOR) Registry >> {
+    ' 工具注册表
+    --
+    ' 存储的工具
+    - _tools : dict[str, Tool]
+    --
+    ' 核心方法
+    + register(tool) : void
+    + unregister(name) : void
+    + get(name) : Tool
+    + get_definitions() : list
+    + execute(name, params) : Any
+    + prepare_call(name, params) : tuple
+}
+
+''' 数据类 '''
+
+class AgentRunSpec << (D,DATA_COLOR) Data >> {
+    ' 单次执行配置
+    --
+    + initial_messages : list
+    + tools : ToolRegistry
+    + model : str
+    + max_iterations : int
+    + max_tool_result_chars : int
+    + hook : AgentHook
+    + workspace : Path
+    + session_key : str
+    + context_window_tokens : int
+    ...
+}
+
+class AgentRunResult << (D,DATA_COLOR) Data >> {
+    ' 执行结果
+    --
+    + final_content : str
+    + messages : list
+    + tools_used : list
+    + usage : dict
+    + stop_reason : str
+    + error : str
+    + tool_events : list
+}
+
+''' 关系定义 '''
+
+' 组合关系：AgentLoop 持有其他组件
+AgentLoop *-- ContextBuilder : context\n构建上下文
+AgentLoop *-- ToolRegistry : tools\n工具注册表
+AgentLoop *-- AgentRunner : runner\n执行引擎
+
+' ContextBuilder 的组合关系
+ContextBuilder *-- MemoryStore : memory\n记忆存储
+ContextBuilder *-- SkillsLoader : skills\n技能加载
+
+' AgentRunner 的依赖关系
+AgentRunner --> LLMProvider : provider\nLLM 后端
+AgentRunner ..> ToolRegistry : via AgentRunSpec\n通过配置传递
+
+' AgentRunSpec 包含 ToolRegistry
+AgentRunSpec *-- ToolRegistry : tools\n工具引用
+
+' AgentRunner 使用 AgentRunSpec/返回 AgentRunResult
+AgentRunner ..> AgentRunSpec : input
+AgentRunner ..> AgentRunResult : output
+
+' AgentLoop 创建 AgentRunSpec 并传递给 Runner
+AgentLoop ..> AgentRunSpec : creates
+AgentLoop ..> AgentRunResult : receives
+
+''' 外部依赖 '''
+
+class MessageBus << (S,SERVICE_COLOR) Service >> {
+    + consume_inbound() : InboundMessage
+    + publish_outbound(msg) : void
+}
+
+class LLMProvider << (S,SERVICE_COLOR) Service >> {
+    + chat(messages, tools, ...) : Response
+    + chat_stream(messages, ...) : Response
+    + chat_with_retry(...) : Response
+}
+
+class SessionManager << (D,DATA_COLOR) Manager >> {
+    + get(key) : Session
+    + save(key, session) : void
+}
+
+class MemoryStore << (D,DATA_COLOR) Store >> {
+    + get_memory_context() : str
+    + read_unprocessed_history() : list
+}
+
+class SkillsLoader << (D,DATA_COLOR) Loader >> {
+    + get_always_skills() : list
+    + load_skills_for_context(names) : str
+    + build_skills_summary() : dict
+}
+
+AgentLoop --> MessageBus : bus\n消息总线
+AgentLoop --> LLMProvider : provider\nLLM 后端
+AgentLoop --> SessionManager : sessions\n会话管理
+
+''' 注释 '''
+
+note right of AgentLoop
+    AgentLoop 是顶层协调者：
+    1. 从 MessageBus 消费消息
+    2. 用 ContextBuilder 构建 prompts
+    3. 用 AgentRunner 执行 LLM + 工具
+    4. 管理 Session、Memory、Skills
+end note
+
+note right of AgentRunner
+    AgentRunner 是执行引擎：
+    1. 接收 AgentRunSpec 配置
+    2. 执行 LLM 请求循环
+    3. 调用 ToolRegistry 执行工具
+    4. 返回 AgentRunResult 结果
+end note
+
+note bottom of ToolRegistry
+    ToolRegistry 是工具注册表：
+    1. 由 AgentLoop 创建
+    2. 注册内置工具 (read, exec, grep...)
+    3. 通过 AgentRunSpec 传递给 AgentRunner
+end note
+
+@enduml

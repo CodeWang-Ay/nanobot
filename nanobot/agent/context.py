@@ -44,9 +44,9 @@ class ContextBuilder:
         if memory:
             parts.append(f"# Memory\n\n{memory}")
 
-        always_skills = self.skills.get_always_skills()
+        always_skills = self.skills.get_always_skills()                     # 元素数据用处在这里
         if always_skills:
-            always_content = self.skills.load_skills_for_context(always_skills)
+            always_content = self.skills.load_skills_for_context(always_skills)             # 获取always属性所有的prompt
             if always_content:
                 parts.append(f"# Active Skills\n\n{always_content}")
 

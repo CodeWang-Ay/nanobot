@@ -107,6 +107,7 @@ class ExecTool(Tool):
         # this, a caller can pass working_dir="/etc" and then all absolute
         # paths under /etc would pass the _guard_command check that anchors
         # on cwd.
+        logger.info(f"shell.py: ExceTool 工具之行 command: {command}")
         if self.restrict_to_workspace and self.working_dir:
             try:
                 requested = Path(cwd).expanduser().resolve()
