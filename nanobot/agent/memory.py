@@ -342,7 +342,6 @@ class MemoryStore:
 # Consolidator — lightweight token-budget triggered consolidation
 # ---------------------------------------------------------------------------
 
-
 class Consolidator:
     """Lightweight consolidation: summarizes evicted messages into history.jsonl."""
 
@@ -384,7 +383,7 @@ class Consolidator:
         tokens_to_remove: int,
     ) -> tuple[int, int] | None:
         """Pick a user-turn boundary that removes enough old prompt tokens."""
-        start = session.last_consolidated
+        start = session.last_consolidated                                                # last 0
         if start >= len(session.messages) or tokens_to_remove <= 0:
             return None
 
@@ -470,22 +469,25 @@ class Consolidator:
 
         The budget reserves space for completion tokens and a safety buffer
         so the LLM request never exceeds the context window.
+            循环：将旧消息存档，直到提示符合安全预算。
+        预算为完成令牌和安全缓冲区预留了空间
+        因此LLM请求永远不会超过上下文窗口。
         """
         if not session.messages or self.context_window_tokens <= 0:
             return
 
         lock = self.get_lock(session.key)
         async with lock:
-            budget = self.context_window_tokens - self.max_completion_tokens - self._SAFETY_BUFFER
-            target = budget // 2
+            budget = self.context_window_tokens - self.max_completion_tokens - self._SAFETY_BUFFER      # 计算安全预算  budget 预算
+            target = budget // 2                                                                        # 目标是压缩到预算的一半
             try:
-                estimated, source = self.estimate_session_prompt_tokens(session)
+                estimated, source = self.estimate_session_prompt_tokens(session)                        # 估算当前 prompt 的 token 数
             except Exception:
                 logger.exception("Token estimation failed for {}", session.key)
                 estimated, source = 0, "error"
-            if estimated <= 0:
+            if estimated <= 0:                                                                          # 判断是否超限
                 return
-            if estimated < budget:
+            if estimated < budget:                                                                      # 不用压缩，
                 unconsolidated_count = len(session.messages) - session.last_consolidated
                 logger.debug(
                     "Token consolidation idle {}: {}/{} via {}, msgs={}",
@@ -496,12 +498,12 @@ class Consolidator:
                     unconsolidated_count,
                 )
                 return
-
-            for round_num in range(self._MAX_CONSOLIDATION_ROUNDS):
-                if estimated <= target:
+            # 需要压缩
+            for round_num in range(self._MAX_CONSOLIDATION_ROUNDS):                                     # 超限后循环压缩， 最多5次
+                if estimated <= target:                                                                 # 已压缩到目标，停止
                     return
 
-                boundary = self.pick_consolidation_boundary(session, max(1, estimated - target))
+                boundary = self.pick_consolidation_boundary(session, max(1, estimated - target))        #   last_boundary = (idx, removed_tokens) 索引位置  移除的token数
                 if boundary is None:
                     logger.debug(
                         "Token consolidation: no safe boundary for {} (round {})",
@@ -511,7 +513,7 @@ class Consolidator:
                     return
 
                 end_idx = boundary[0]
-                end_idx = self._cap_consolidation_boundary(session, end_idx)
+                end_idx = self._cap_consolidation_boundary(session, end_idx)                            # end_idx - start_end 超过60, 就先压缩60条消息
                 if end_idx is None:
                     logger.debug(
                         "Token consolidation: no capped boundary for {} (round {})",
@@ -533,13 +535,13 @@ class Consolidator:
                     source,
                     len(chunk),
                 )
-                if not await self.archive(chunk):
+                if not await self.archive(chunk):                                           # 选择截断边界，调用 archive() 摘要
                     return
                 session.last_consolidated = end_idx
                 self.sessions.save(session)
 
                 try:
-                    estimated, source = self.estimate_session_prompt_tokens(session)
+                    estimated, source = self.estimate_session_prompt_tokens(session)        # 更新至， 估算当前 prompt 的 token 数
                 except Exception:
                     logger.exception("Token estimation failed for {}", session.key)
                     estimated, source = 0, "error"
@@ -603,7 +605,6 @@ class Dream:
         return tools
 
     # -- skill listing --------------------------------------------------------
-
     def _list_existing_skills(self) -> list[str]:
         """List existing skills as 'name — description' for dedup context."""
         import re as _re

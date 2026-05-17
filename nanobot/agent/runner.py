@@ -255,7 +255,6 @@ class AgentRunner:
                 )
 
                 await hook.before_execute_tools(context)
-
                 results, new_events, fatal_error = await self._execute_tools(
                     spec,
                     response.tool_calls,
