@@ -1,0 +1,266 @@
+@startuml Tool 抽象类图
+skinparam class {
+    BackgroundColor #f9f9f9
+    BorderColor #2c3e50
+    AttributeColor #2980b9
+    MethodColor #e74c3c
+}
+skinparam note {
+    BackgroundColor #ecf0f1
+    BorderColor #7f8c8d
+}
+
+class ToolRegistry {
+    - _tools: dict[str, Tool]
+    
+    + __init__()
+    + register(tool)
+    + unregister(name)
+    + get(name)
+    + has(name)
+    + {static} _schema_name(schema)
+    + get_definitions()
+    + prepare_call(name, params)
+    + execute(name, params)
+    + tool_names()
+    + __len__()
+    + __contains__(name)
+}
+
+
+' 抽象类用 abstract 标注
+abstract class Tool {    
+    {static} _resolve_type(t)
+    {abstract} + name()
+    {abstract} + description()
+    {abstract} + parameters()
+    + read_only()
+    + concurrency_safe()
+    + exclusive()
+    {abstract} + execute(**kwargs)
+    + _cast_object(obj, schema)
+    + cast_params(params)
+    + _cast_value(val, schema)
+    + validate_params(params)
+    + to_schema()
+}
+
+class CronTool {
+    - cron_service: CronService
+    - default_timezone: str
+    
+    + __init__(cron_service, default_timezone)
+    + set_context(channel, chat_id)
+    + set_cron_context(active)
+    + reset_cron_context(token)
+    {static} + _validate_timezone(tz)
+    + _display_timezone(schedule)
+    {static} + _format_timestamp(ms, tz_name)
+    + name()
+    + description()
+    + execute(action, ...)
+    + _add_job(name, message, every_seconds, ...)
+    + _format_timing(schedule)
+    + _format_state(state, schedule)
+    {static} + _system_job_purpose(job)
+    + _list_jobs()
+    + _remove_job(job_id)
+}
+
+class _FsTool {
+    - workspace: 路径
+    - allowed_dir: 路径
+    - extra_allowed_dirs: 路径列表
+    
+    + __init__(workspace, allowed_dir, extra_allowed_dirs)
+    + _resolve(path)
+}
+
+' 文件系统基类
+class _FsTool {
+    - workspace: Path
+    - allowed_dir: Path
+    - extra_allowed_dirs: list[Path]
+    + __init__(workspace, allowed_dir, extra_allowed_dirs)
+    + _resolve(path)
+}
+
+' 文件操作工具
+class ReadFileTool {
+    {static} _MAX_CHARS: int
+    {static} _DEFAULT_LIMIT: int
+    {static} _MAX_PDF_PAGES: int
+    + name()
+    + description()
+    + read_only()
+    + execute(path, offset, limit, pages)
+    + _read_pdf(fp, pages)
+}
+
+class WriteFileTool {
+    + name()
+    + description()
+    + execute(path, content)
+}
+
+class EditFileTool {
+    {static} _MAX_EDIT_FILE_SIZE: int
+    {static} _MARKDOWN_EXTS: frozenset
+    + name()
+    + description()
+    {static} + _strip_trailing_ws(text)
+    + execute(path, old_text, new_text, replace_all)
+    + _file_not_found_msg(path, fp)
+    {static} + _not_found_msg(old_text, content, path)
+}
+
+class ListDirTool {
+    {static} _DEFAULT_MAX: int
+    {static} _IGNORE_DIRS: set
+    + name()
+    + description()
+    + read_only()
+    + execute(path, recursive, max_entries)
+}
+
+class NotebookEditTool {
+    {static} _VALID_CELL_TYPES: frozenset
+    {static} _VALID_EDIT_MODES: frozenset
+    + name()
+    + description()
+    + execute(path, cell_index, new_source, cell_type, edit_mode)
+}
+
+' MCP 包装工具
+class MCPToolWrapper {
+    + __init__(session, server_name, tool_def, tool_timeout)
+    + name()
+    + description()
+    + parameters()
+    + execute(**kwargs)
+}
+
+class MCPResourceWrapper {
+    + __init__(session, server_name, resource_def, resource_timeout)
+    + name()
+    + description()
+    + parameters()
+    + read_only()
+    + execute(**kwargs)
+}
+
+class MCPPromptWrapper {
+    + __init__(session, server_name, prompt_def, prompt_timeout)
+    + name()
+    + description()
+    + parameters()
+    + read_only()
+    + execute(**kwargs)
+}
+
+' 消息工具
+class MessageTool {
+    + __init__(send_callback, default_channel, default_chat_id, default_message_id)
+    + set_context(channel, chat_id, message_id)
+    + set_send_callback(callback)
+    + start_turn()
+    + name()
+    + description()
+    + execute(content, channel, chat_id, message_id, media)
+}
+
+abstract class _SearchTool {
+    {static} _IGNORE_DIRS: set
+    + _display_path(target, root)
+    + _iter_files(root)
+    + _iter_entries(root, include_files, include_dirs)
+}
+
+
+
+class GlobTool {
+    + name()
+    + description()
+    + read_only()
+    + parameters()
+    + execute(pattern, path, max_results, head_limit, offset, entry_type)
+}
+
+class GrepTool {
+    {static} _MAX_RESULT_CHARS: int
+    {static} _MAX_FILE_BYTES: int
+    + name()
+    + description()
+    + read_only()
+    + parameters()
+    {static} _format_block(display_path, lines, match_line, before, after)
+    + execute(pattern, path, glob, type, case_insensitive, ...)
+}
+
+
+
+class SpawnTool {
+    - manager: SubagentManager
+    + __init__(manager)
+    + set_context(channel, chat_id)
+    + name()
+    + description()
+    + execute(task, label)
+}
+
+class ExecTool {
+    {static} _MAX_TIMEOUT: int
+    {static} _MAX_OUTPUT: int
+    
+    + __init__()
+    + name()
+    + description()
+    + exclusive()
+    + execute(command, working_dir, timeout)
+    {static} + _spawn(command, cwd, env)
+    {static} + _kill_process(process)
+    + _build_env()
+    + _guard_command(command, cwd)
+    {static} + _extract_absolute_paths(command)
+}
+
+
+class WebFetchTool {
+    - max_chars: int
+    - proxy: str
+    + __init__(max_chars, proxy)
+    + name()
+    + description()
+    + read_only()
+    + execute(url, extractMode, maxChars)
+    + _fetch_jina(url, max_chars)
+    + _fetch_readability(url, extract_mode, max_chars)
+    + _to_markdown(html_content)
+}
+
+
+
+ReadFileTool --|> _FsTool   : 继承 _FsTool 类
+WriteFileTool --|> _FsTool  : 继承 _FsTool 类
+EditFileTool --|> _FsTool   : 继承 _FsTool 类
+ListDirTool --|> _FsTool    : 继承 _FsTool 类
+NotebookEditTool --|> _FsTool: 继承 _FsTool 类
+
+CronTool --|> Tool          : 继承tool类
+_FsTool --|> Tool           : 继承tool类
+MCPToolWrapper --|> Tool    : 继承tool类
+MCPResourceWrapper --|> Tool : 继承tool类
+MCPPromptWrapper --|> Tool  : 继承tool类
+MessageTool --|> Tool   : 继承tool类
+
+_SearchTool --|> Tool   : 继承tool类
+GlobTool --|> Tool      : 继承tool类
+GrepTool --|> Tool      : 继承tool类
+SpawnTool --|> Tool     : 继承tool类
+ExecTool --|> Tool      : 继承tool类
+WebFetchTool --|> Tool  : 继承tool类
+
+' 组合关系
+ToolRegistry *-- Tool : 组合
+
+@enduml

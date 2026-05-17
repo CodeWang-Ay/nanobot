@@ -219,14 +219,14 @@ class ObjectSchema(Schema):
 
 
 def tool_parameters_schema(
-    *,
+    *,                          # 数字
     required: list[str] | None = None,
     description: str = "",
-    **properties: Any,
+    **properties: Any,          # 字典
 ) -> dict[str, Any]:
     """Build root tool parameters ``{"type": "object", "properties": ...}`` for :meth:`Tool.parameters`."""
     return ObjectSchema(
         required=required,
         description=description,
         **properties,
-    ).to_json_schema()
+    ).to_json_schema()          # 将对象转化为字典

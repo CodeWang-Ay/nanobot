@@ -242,7 +242,8 @@ class Tool(ABC):
             },
         }
 
-
+# 装饰器标准写法 todo 带学习 闭包函数
+# tool_parameters_schema 对应的 大的object_schema
 def tool_parameters(schema: dict[str, Any]) -> Callable[[type[_ToolT]], type[_ToolT]]:
     """Class decorator: attach JSON Schema and inject a concrete ``parameters`` property.
 

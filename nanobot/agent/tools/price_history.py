@@ -8,6 +8,7 @@ from nanobot.agent.tools.base import Tool, tool_parameters
 from nanobot.agent.tools.base import Tool
 from nanobot.agent.tools.schema import IntegerSchema, StringSchema, tool_parameters_schema
 
+# 
 @tool_parameters(
     tool_parameters_schema(
         material_id=StringSchema("要查询历史价格的物料编号", min_length=1),

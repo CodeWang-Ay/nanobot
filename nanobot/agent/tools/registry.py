@@ -48,7 +48,7 @@ class ToolRegistry:
         Built-in tools are sorted first as a stable prefix, then MCP tools are
         sorted and appended.
         """
-        definitions = [tool.to_schema() for tool in self._tools.values()]
+        definitions = [tool.to_schema() for tool in self._tools.values()]               # 就是把 Tool 对象转换为 OpenAI Function Calling API 兼容的 JSON 格式：这个格式可以直接传给 OpenAI API 的 tools 参数，让 LLM 知道有哪些工具可用以及如何调用它们。
         builtins: list[dict[str, Any]] = []
         mcp_tools: list[dict[str, Any]] = []
         for schema in definitions:
