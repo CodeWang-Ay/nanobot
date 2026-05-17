@@ -15,6 +15,7 @@
 | 05 | [MemorySystem.md](./05-MemorySystem.md) | MemoryStore, Consolidator, Dream | 766 | 三层记忆系统 |
 | 06 | [ContextBuilder.md](./06-ContextBuilder.md) | ContextBuilder | 200 | 上下文构建器 |
 | 07 | [AutoCompact.md](./07-AutoCompact.md) | AutoCompact | 115 | 自动压缩器 |
+| 08 | [AgentFlow.md](./08-AgentFlow.md) | - | - | Agent 执行流程完整链路 |
 
 ## 核心架构关系
 

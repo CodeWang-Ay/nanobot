@@ -1,0 +1,243 @@
+@startuml AgentLoop-ClassDiagram
+
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam shadowing false
+
+title AgentLoop 核心架构类图
+
+' ==================== 核心类 ====================
+class AgentLoop <<核心引擎>> {
+    ' === 组合属性（强拥有） ===
+    - context: ContextBuilder
+    - sessions: SessionManager
+    - tools: ToolRegistry
+    - runner: AgentRunner
+    - subagents: SubagentManager
+    - consolidator: Consolidator
+    - auto_compact: AutoCompact
+    - dream: Dream
+    - commands: CommandRouter
+
+    ' === 关联属性（外部依赖） ===
+    - bus: MessageBus
+    - provider: LLMProvider
+    - workspace: Path
+    - model: str
+    - max_iterations: int
+    - context_window_tokens: int
+    - cron_service: CronService?
+
+    ' === 内部状态 ===
+    - _running: bool
+    - _mcp_servers: dict
+    - _active_tasks: dict
+    - _pending_queues: dict
+    - _session_locks: dict
+
+    ' === 初始化 ===
+    + __init__(bus, provider, workspace, ...)
+
+    ' === 生命周期 ===
+    + run()              ' 主事件循环
+    + stop()             ' 停止循环
+    + close_mcp()        ' 关闭MCP连接
+
+    ' === 核心流程 ===
+    - _dispatch(msg)                     ' 消息分发
+    - _process_message(msg, ...)         ' 单条消息处理
+    - _run_agent_loop(messages, ...)     ' Agent迭代循环
+    - _register_default_tools()          ' 注册内置工具
+    - _connect_mcp()                     ' 连接MCP服务器
+
+    ' === 会话管理 ===
+    - _effective_session_key(msg)        ' 计算会话键
+    - _set_runtime_checkpoint(...)       ' 设置检查点
+    - _clear_runtime_checkpoint(...)     ' 清除检查点
+    - _restore_runtime_checkpoint(...)   ' 恢复检查点
+    - _save_turn(session, messages, ...) ' 保存对话轮次
+
+    ' === 工具辅助 ===
+    - _set_tool_context(...)             ' 设置工具上下文
+    - _strip_think(text)                 ' 过滤推理块
+    - _tool_hint(tool_calls)             ' 格式化工具提示
+    - _schedule_background(coro)         ' 后台任务调度
+
+    ' === 消息处理 ===
+    - _sanitize_persisted_blocks(...)    ' 过滤多模态内容
+    - _checkpoint_message_key(...)       ' 消息唯一键计算
+    + process_direct(content, ...)       ' 直接处理接口
+}
+
+' ==================== 组合关系的类 ====================
+class ContextBuilder <<上下文构建器>> {
+    - workspace: Path
+    - timezone: str?
+    - memory: MemoryStore
+    - skills: SkillsLoader
+
+    + build_system_prompt(...)
+    + build_messages(...)
+    + add_tool_result(...)
+    + add_assistant_message(...)
+}
+
+class AgentRunner <<执行引擎>> {
+    - provider: LLMProvider
+
+    + run(spec: AgentRunSpec): AgentRunResult
+    - _request_model(...)
+    - _execute_tools(...)
+    - _snip_history(...)
+    - _microcompact(...)
+}
+
+class SessionManager <<会话管理>> {
+    - workspace: Path
+
+    + get_or_create(key): Session
+    + save(session)
+}
+
+class ToolRegistry <<工具注册>> {
+    + register(tool)
+    + get(name): Tool?
+    + execute(name, params)
+    + get_definitions()
+}
+
+class SubagentManager <<子Agent管理>> {
+    - provider: LLMProvider
+    - workspace: Path
+
+    + spawn(prompt, ...)
+}
+
+class Consolidator <<记忆合并>> {
+    + maybe_consolidate_by_tokens(...)
+}
+
+class AutoCompact <<自动压缩>> {
+    + prepare_session(...)
+    + check_expired(...)
+}
+
+class Dream <<长期记忆>> {
+    + run()
+}
+
+' ==================== 关联关系的类 ====================
+class MessageBus <<消息总线>> {
+    + consume_inbound(): InboundMessage
+    + publish_inbound(msg)
+    + publish_outbound(msg)
+}
+
+class LLMProvider <<LLM提供商>> {
+    + chat(messages, ...): Response
+    + chat_stream(messages, ...): Response
+    + chat_with_retry(...)
+    + chat_stream_with_retry(...)
+}
+
+' ==================== 数据类 ====================
+class InboundMessage <<入站消息>> {
+    + channel: str
+    + sender_id: str
+    + chat_id: str
+    + content: str
+    + media: list?
+    + session_key: str
+    + metadata: dict
+}
+
+class OutboundMessage <<出站消息>> {
+    + channel: str
+    + chat_id: str
+    + content: str
+    + metadata: dict
+}
+
+class Session <<会话>> {
+    + key: str
+    + messages: list
+    + metadata: dict
+    + get_history(...)
+}
+
+class AgentRunSpec <<执行配置>> {
+    + initial_messages: list
+    + tools: ToolRegistry
+    + model: str
+    + max_iterations: int
+    + hook: AgentHook?
+}
+
+class AgentRunResult <<执行结果>> {
+    + final_content: str?
+    + messages: list
+    + tools_used: list
+    + usage: dict
+    + stop_reason: str
+}
+
+' ==================== 组合关系（实心菱形） ====================
+AgentLoop *-- ContextBuilder : context
+AgentLoop *-- AgentRunner : runner
+AgentLoop *-- SessionManager : sessions
+AgentLoop *-- ToolRegistry : tools
+AgentLoop *-- SubagentManager : subagents
+AgentLoop *-- Consolidator : consolidator
+AgentLoop *-- AutoCompact : auto_compact
+AgentLoop *-- Dream : dream
+AgentLoop *-- CommandRouter : commands
+
+' ==================== 关联关系（空心菱形/普通箭头） ====================
+AgentLoop --> MessageBus : bus\n(依赖注入)
+AgentLoop --> LLMProvider : provider\n(依赖注入)
+AgentLoop --> InboundMessage : consumes
+AgentLoop --> OutboundMessage : produces
+
+' ==================== AgentRunner 的关系 ====================
+AgentRunner --> LLMProvider : provider
+AgentRunner ..> AgentRunSpec : 使用
+AgentRunner ..> AgentRunResult : 返回
+
+' ==================== ContextBuilder 的组合 ====================
+ContextBuilder *-- MemoryStore : memory
+ContextBuilder *-- SkillsLoader : skills
+
+' ==================== SessionManager 的关系 ====================
+SessionManager ..> Session : 管理
+
+' ==================== 注释：核心流程 ====================
+note right of AgentLoop::run
+    主事件循环流程：
+    1. bus.consume_inbound()
+    2. 检查 pending_queues
+    3. _dispatch(msg)
+    --> _process_message()
+    --> _run_agent_loop()
+end note
+
+note right of AgentLoop::_process_message
+    单条消息处理：
+    1. 获取/创建会话
+    2. 处理 slash 命令
+    3. context.build_messages()
+    4. runner.run() (LLM+工具)
+    5. _save_turn() 保存历史
+    6. bus.publish_outbound()
+end note
+
+note bottom of AgentRunner::run
+    Agent迭代循环：
+    for iteration in max_iterations:
+        1. _request_model() 调用LLM
+        2. 检查 tool_calls
+        3. _execute_tools() 执行工具
+        4. 循环或返回结果
+end note
+
+@enduml

@@ -1,7 +1,7 @@
 ---
 name: audit_cw08
 description: "[强制触发] 当用户需要执行 CW08 因公出差报销流程审计时，必须使用本 skill。传入流程编号 request_id 进行审计，最终输出 JSON 格式审计报告"
-metadata: {"nanobot":{"emoji":"🔍", "always": true}}
+metadata: {"nanobot":{"emoji":"🔍"}}
 ---
 
 # CW08 流程审计技能

@@ -455,7 +455,7 @@ class AgentLoop:
 
         while self._running:
             try:
-                # 
+                # 启动nanobot的时候已经启动了 一只监听，等待消息进来消费消息
                 msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)               # 拿消息进行消费，最多1s，无消息则continue 防止阻塞
             except asyncio.TimeoutError:
                 self.auto_compact.check_expired(self._schedule_background)
@@ -633,7 +633,7 @@ class AgentLoop:
         pending_queue: asyncio.Queue | None = None,
     ) -> OutboundMessage | None:
         """Process a single inbound message and return the response."""
-        # System messages: parse origin from chat_id ("channel:chat_id")
+        # System messages: parse origin from chat_id ("channel:chat_id")  默认为 msg.channel, cli
         if msg.channel == "system":
             channel, chat_id = (
                 msg.chat_id.split(":", 1) if ":" in msg.chat_id else ("cli", msg.chat_id)
@@ -675,16 +675,16 @@ class AgentLoop:
                 chat_id=chat_id,
                 content=final_content or "Background task completed.",
             )
-
-        preview = msg.content[:80] + "..." if len(msg.content) > 80 else msg.content
+        
+        preview = msg.content[:80] + "..." if len(msg.content) > 80 else msg.content            # cli 终端输入内容
         logger.info("Processing message from {}:{}: {}", msg.channel, msg.sender_id, preview)
 
         key = session_key or msg.session_key
-        session = self.sessions.get_or_create(key)
+        session = self.sessions.get_or_create(key)                                              #  [1. 获取或创建会话]  Session对象【核心】获取或创建会话：缓存优先 → 加载/创建 → 缓存  
         if self._restore_runtime_checkpoint(session):
             self.sessions.save(session)
 
-        session, pending = self.auto_compact.prepare_session(session, key)
+        session, pending = self.auto_compact.prepare_session(session, key)                      # 处理前后session没变化【核心】准备会话：处理归档状态 + 返回摘要  
 
         # Slash commands
         raw = msg.content.strip()
@@ -692,16 +692,16 @@ class AgentLoop:
         if result := await self.commands.dispatch(ctx):
             return result
 
-        await self.consolidator.maybe_consolidate_by_tokens(session)
+        await self.consolidator.maybe_consolidate_by_tokens(session)                            # 可能按token合并
 
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
         if message_tool := self.tools.get("message"):
             if isinstance(message_tool, MessageTool):
                 message_tool.start_turn()
 
-        history = session.get_history(max_messages=0)
+        history = session.get_history(max_messages=0)                                           #  [2. 加载历史消息]  
 
-        initial_messages = self.context.build_messages(
+        initial_messages = self.context.build_messages(                                         #  [3. 构建上下文（系统提示 + 历史 + 当前消息 + skills元数据）]
             history=history,
             current_message=msg.content,
             session_summary=pending,
@@ -722,7 +722,7 @@ class AgentLoop:
                     metadata=meta,
                 )
             )
-
+        # [4. 运行 Agent 循环（LLM ↔ 工具调用）]
         final_content, _, all_msgs, stop_reason, had_injections = await self._run_agent_loop(
             initial_messages,
             on_progress=on_progress or _bus_progress,

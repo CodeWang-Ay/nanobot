@@ -44,13 +44,13 @@ class ContextBuilder:
         if memory:
             parts.append(f"# Memory\n\n{memory}")
 
-        always_skills = self.skills.get_always_skills()                     # 元素数据用处在这里
+        always_skills = self.skills.get_always_skills()                     # 元素数据用处在这里， 如果配置always， 则读取所有信息
         if always_skills:
             always_content = self.skills.load_skills_for_context(always_skills)             # 获取always属性所有的prompt
             if always_content:
                 parts.append(f"# Active Skills\n\n{always_content}")
 
-        skills_summary = self.skills.build_skills_summary()
+        skills_summary = self.skills.build_skills_summary()                 # skill 元数据， 
         if skills_summary:
             parts.append(render_template("agent/skills_section.md", skills_summary=skills_summary))
 
@@ -128,7 +128,7 @@ class ContextBuilder:
         session_summary: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build the complete message list for an LLM call."""
-        runtime_ctx = self._build_runtime_context(channel, chat_id, self.timezone, session_summary=session_summary)
+        runtime_ctx = self._build_runtime_context(channel, chat_id, self.timezone, session_summary=session_summary)     # 当前的时间， channel等信息
         user_content = self._build_user_content(current_message, media)
 
         # Merge runtime context and user content into a single user message

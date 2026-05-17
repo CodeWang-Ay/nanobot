@@ -1,0 +1,331 @@
+@startuml AgentLoop 类结构
+' 设置样式
+skinparam class {
+    BackgroundColor #f9f9f9
+    BorderColor #2c3e50
+    AttributeColor #2980b9
+    MethodColor #27ae60
+}
+skinparam note {
+    BackgroundColor #ecf0f1
+    BorderColor #7f8c8d
+}
+skinparam package {
+    BackgroundColor #e8f4fd
+    BorderColor #3498db
+}
+
+' 依赖的外部类（简化声明）
+class ContextBuilder
+class ToolRegistry
+class AgentRunner
+
+' ==========================
+' 1. AgentRunner 类
+' ==========================
+
+' 核心类 AgentLoop
+class AgentLoop {    
+    + context: ContextBuilder
+    + tools: ToolRegistry
+    + runner: AgentRunner
+    + bus: 消息总线
+    + provider: LLM提供商
+    + workspace: 工作目录
+    + session_manager: 会话管理器
+    + sub_agent_manager: 子Agent管理器
+    + mcp_servers: MCP服务器连接列表
+
+    + __init__(bus, provider, workspace, ...)
+    + _register_default_tools()
+    + _connect_mcp()
+    + _set_tool_context(channel, chat_id, message_id)
+    + _strip_think(text)
+    + _tool_hint(tool_calls)
+    + _effective_session_key(msg)
+    + _run_agent_loop(messages, session, ...)
+    + run()
+    + _dispatch(msg)
+    + close_mcp()
+    + _schedule_background(coro)
+    + stop()
+    + _process_message(msg, ...)
+    + _sanitize_persisted_blocks(content, ...)
+    + _save_turn(session, messages, skip)
+    + _set_runtime_checkpoint(session, payload)
+    + _clear_runtime_checkpoint(session)
+    + _checkpoint_message_key(message)
+    + _restore_runtime_checkpoint(session)
+    + process_direct(content, ...)
+}
+
+' ==========================
+' 2. AgentRunner 类
+' ==========================
+class AutoCompact {
+    - sessions: SessionManager
+    - consolidator: 会话合并器
+    - session_ttl_minutes: int
+
+    + __init__(sessions, consolidator, session_ttl_minutes)
+    + _is_expired(ts)
+    + _format_summary(text, last_active)
+    + _split_unconsolidated(session)
+    + check_expired(schedule_background)
+    + _archive(key)
+    + prepare_session(session, key)
+}
+
+' ==========================
+' 3. AgentRunner 类
+' ==========================
+class AgentRunner {
+    - provider: LLM提供商
+    
+    + __init__(provider)
+    + _merge_message_content(left, right)
+    + _append_injected_messages(messages, injections)
+    + _drain_injections(spec)
+    + run(spec)
+    + _build_request_kwargs(spec, messages, tools)
+    + _request_model(spec, messages, hook, context)
+    + _request_finalization_retry(spec, messages)
+    + _usage_dict(usage)
+    + _accumulate_usage(target, addition)
+    + _merge_usage(left, right)
+    + _execute_tools(spec, tool_calls, lookup_counts)
+    + _run_tool(spec, tool_call, lookup_counts)
+    + _emit_checkpoint(spec, payload)
+    + _append_final_message(messages, content)
+    + _append_model_error_placeholder(messages)
+    + _normalize_tool_result(spec, id, name, result)
+    + _drop_orphan_tool_results(messages)
+    + _backfill_missing_tool_results(messages)
+    + _microcompact(messages)
+    + _apply_tool_result_budget(spec, messages)
+    + _snip_history(spec, messages)
+    + _partition_tool_batches(spec, tool_calls)
+}
+
+
+
+
+' ==========================
+' ToolRegistry
+' ==========================
+class ToolRegistry {
+    - tools: Dict[str, Tool]
+    + __init__()
+    + register(tool)
+    + unregister(name)
+    + get(name)
+    + has(name)
+    + _schema_name(schema)
+    + get_definitions()
+    + prepare_call(name, params)
+    + execute(name, params)
+    + tool_names()
+    + __len__()
+    + __contains__(name)
+}
+
+
+' ==========================
+' SubagentManager
+' ==========================
+class SubagentManager {
+    - provider: LLM提供商
+    - workspace: 工作目录
+    - bus: 消息总线
+    - max_tool_result_chars: int
+    + __init__(provider, workspace, bus, max_tool_result_chars, ...)
+    + spawn(task, label, origin_channel, origin_chat_id, session_key)
+    + _run_subagent(task_id, task, label, origin)
+    + _announce_result(task_id, label, task, result, origin, status)
+    + _format_partial_progress(result)
+    + _build_subagent_prompt()
+    + cancel_by_session(session_key)
+    + get_running_count()
+}
+
+
+' ==========================
+' 3. ContextBuilder 类
+' ==========================
+class ContextBuilder {
+    - workspace: 工作目录
+    - timezone: 时区
+    - disabled_skills: 禁用技能列表
+    
+    + __init__(workspace, timezone, disabled_skills)
+    + build_system_prompt(skill_names, channel)
+    + _get_identity(channel)
+    + _build_runtime_context(channel, chat_id, timezone, ...)
+    + _merge_message_content(left, right)
+    + _load_bootstrap_files()
+    + build_messages(history, current_message, ...)
+    + _build_user_content(text, media)
+    + add_tool_result(messages, tool_call_id, tool_name, result)
+    + add_assistant_message(messages, content, ...)
+}
+
+' ==========================
+' SkillsLoader。 ContextBuilder 中的成员属性 组合关系
+' ==========================
+class SkillsLoader {
+    - workspace: str
+    - builtin_skills_dir: str
+    - disabled_skills: List[str]
+    + __init__(workspace, builtin_skills_dir, disabled_skills)
+    + _skill_entries_from_dir(base, source, skip_names)
+    + list_skills(filter_unavailable)
+    + load_skill(name)
+    + load_skills_for_context(skill_names)
+    + build_skills_summary()
+    + _get_missing_requirements(skill_meta)
+    + _get_skill_description(name)
+    + _strip_frontmatter(content)
+    + _parse_nanobot_metadata(raw)
+    + _check_requirements(skill_meta)
+    + _get_skill_meta(name)
+    + get_always_skills()
+    + get_skill_metadata(name)
+}
+
+
+' ==========================
+' MemoryStore ContextBuilder 中的成员属性 组合关系
+' ==========================
+class MemoryStore {
+    - workspace: str
+    - max_history_entries: int
+    - git: GitStore
+    + __init__(workspace, max_history_entries)
+    + read_file(path)
+    + _maybe_migrate_legacy_history()
+    + _parse_legacy_history(text)
+    + _split_legacy_history_chunks(text)
+    + _should_start_new_legacy_chunk(line, current)
+    + _is_raw_legacy_chunk(lines)
+    + _legacy_fallback_timestamp()
+    + _next_legacy_backup_path()
+    + read_memory()
+    + write_memory(content)
+    + read_soul()
+    + write_soul(content)
+    + read_user()
+    + write_user(content)
+    + get_memory_context()
+    + append_history(entry)
+    + _next_cursor()
+    + read_unprocessed_history(since_cursor)
+    + compact_history()
+    + _read_entries()
+    + _read_last_entry()
+    + _write_entries(entries)
+    + get_last_dream_cursor()
+    + set_last_dream_cursor(cursor)
+    + _format_messages(messages)
+    + raw_archive(messages)
+}
+
+' agent loop 组合SessionManager, 作为成员属性
+class SessionManager {
+    + workspace: Path
+    + sessions_dir: Path
+    + legacy_sessions_dir: Path
+    - _cache: dict[str, Session]
+    
+    + __init__(workspace)
+    + _get_session_path(key) : Path
+    + _get_legacy_session_path(key) : Path
+    + get_or_create(key) : Session
+    + _load(key) : Session | None
+    + save(session)
+    + invalidate(key)
+    + list_sessions() : list[dict]
+}
+
+' agent loop 依赖 _LoopHook类
+class _LoopHook {
+    - agent_loop: AgentLoop
+    - on_progress: 回调函数
+    - on_stream: 回调函数
+    
+    + __init__(agent_loop, on_progress, on_stream, ...)
+    + wants_streaming()
+    + on_stream(context, delta)
+    + on_stream_end(context, resuming)
+    + before_execute_tools(context)
+    + after_iteration(context)
+    + finalize_content(context, content)
+}
+
+
+' AgentHook 是 _LoopHook的 父类
+class AgentHook {
+    - reraise: bool
+    
+    + __init__(reraise)
+    + wants_streaming() : bool
+    + before_iteration(context)
+    + on_stream(context, delta)
+    + on_stream_end(context, *, resuming)
+    + before_execute_tools(context)
+    + after_iteration(context)
+    + finalize_content(context, content) : str
+}
+
+
+' AgentLoop ◆───→ ContextBuilder  （组合：AgentLoop 创建并持有）
+' AgentLoop ◆───→ SessionManager  （组合）
+' AgentLoop ◆───→ ToolRegistry     （组合）
+' AgentLoop ◆───→ AgentRunner      （组合）
+' AgentLoop ◆───→ SubagentManager
+' AgentLoop ◆───→ SkillsLoader
+' AgentLoop ◆───→ MemoryStore
+
+
+' ' agent loop组合关系
+AgentLoop *-- ContextBuilder : 组合
+AgentLoop *-- SubagentManager : 组合
+AgentLoop *-- AgentRunner : 组合
+AgentLoop *-- ToolRegistry : 组合
+AgentLoop *-- SessionManager : 组合
+AgentLoop *-- AutoCompact : 组合
+AgentLoop ..> _LoopHook : 依赖
+
+' ' context 组合关系
+ContextBuilder *-- MemoryStore : 组合
+ContextBuilder *-- SkillsLoader : 组合
+
+'
+SubagentManager *-- AgentRunner : 组合
+
+' 继承关系
+_LoopHook --|> AgentHook : 继承
+
+' ' 方法调用核心流程（箭头表示调用方向）
+' AgentLoop::run --> AgentLoop::_dispatch : 调用
+' AgentLoop::_dispatch --> AgentLoop::_process_message : 调用
+' AgentLoop::_process_message --> AgentLoop::_run_agent_loop : 调用
+' AgentLoop::_run_agent_loop --> AgentRunner::run : 执行LLM+工具
+
+' AgentLoop::_process_message --> AgentLoop::_sanitize_persisted_blocks : 调用
+' AgentLoop::_process_message --> AgentLoop::_save_turn : 调用
+' AgentLoop::_process_message --> AgentLoop::_set_runtime_checkpoint : 调用
+' AgentLoop::_process_message --> AgentLoop::_clear_runtime_checkpoint : 调用
+' AgentLoop::_process_message --> AgentLoop::_restore_runtime_checkpoint : 调用
+
+' AgentLoop::_run_agent_loop --> AgentLoop::_strip_think : 调用
+' AgentLoop::_run_agent_loop --> AgentLoop::_tool_hint : 调用
+' AgentLoop::_run_agent_loop --> AgentLoop::_effective_session_key : 调用
+' AgentLoop::_run_agent_loop --> AgentLoop::_set_tool_context : 调用
+
+' AgentLoop::__init__ --> AgentLoop::_register_default_tools : 初始化调用
+' AgentLoop::__init__ --> AgentLoop::_connect_mcp : 初始化调用
+' AgentLoop::stop --> AgentLoop::close_mcp : 关闭连接
+' AgentLoop::stop --> AgentLoop::_schedule_background : 后台任务
+' AgentLoop::close_mcp --> AgentLoop::mcp_servers : 操作
+
+@enduml

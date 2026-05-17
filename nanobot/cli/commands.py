@@ -989,7 +989,7 @@ def agent(
 
         # 1. 进行交互
         async def run_interactive():            
-            bus_task = asyncio.create_task(agent_loop.run())
+            bus_task = asyncio.create_task(agent_loop.run())                        # 进入 loop.py 中的 run方法()
             turn_done = asyncio.Event()
             turn_done.set()
             turn_response: list[tuple[str, dict]] = []
