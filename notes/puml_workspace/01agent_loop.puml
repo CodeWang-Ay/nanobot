@@ -1,0 +1,109 @@
+@startuml AgentLoop 类结构
+' 设置样式
+skinparam class {
+    BackgroundColor #f9f9f9
+    BorderColor #2c3e50
+    AttributeColor #2980b9
+    MethodColor #27ae60
+}
+skinparam note {
+    BackgroundColor #ecf0f1
+    BorderColor #7f8c8d
+}
+skinparam package {
+    BackgroundColor #e8f4fd
+    BorderColor #3498db
+}
+
+
+
+' ==================== 核心类 ====================
+class AgentLoop {    
+    + context: ContextBuilder
+    + tools: ToolRegistry
+    + runner: AgentRunner
+    + bus: 消息总线
+    + provider: LLM提供商
+    + workspace: 工作目录
+    + session_manager: 会话管理器
+    + sub_agent_manager: 子Agent管理器
+    + mcp_servers: MCP服务器连接列表
+
+    + __init__(bus, provider, workspace, ...)
+    + _register_default_tools()
+    + _connect_mcp()
+    + _set_tool_context(channel, chat_id, message_id)
+    + _strip_think(text)
+    + _tool_hint(tool_calls)
+    + _effective_session_key(msg)
+    + _run_agent_loop(messages, session, ...)
+    + run()
+    + _dispatch(msg)
+    + close_mcp()
+    + _schedule_background(coro)
+    + stop()
+    + _process_message(msg, ...)
+    + _sanitize_persisted_blocks(content, ...)
+    + _save_turn(session, messages, skip)
+    + _set_runtime_checkpoint(session, payload)
+    + _clear_runtime_checkpoint(session)
+    + _checkpoint_message_key(message)
+    + _restore_runtime_checkpoint(session)
+    + process_direct(content, ...)
+}
+
+' ==========================
+' 3. AgentRunner 类
+' ==========================
+class AgentRunner {
+    - provider: LLM提供商
+    
+    + __init__(provider)
+    + _merge_message_content(left, right)
+    + _append_injected_messages(messages, injections)
+    + _drain_injections(spec)
+    + run(spec)
+    + _build_request_kwargs(spec, messages, tools)
+    + _request_model(spec, messages, hook, context)
+    + _request_finalization_retry(spec, messages)
+    + _usage_dict(usage)
+    + _accumulate_usage(target, addition)
+    + _merge_usage(left, right)
+    + _execute_tools(spec, tool_calls, lookup_counts)
+    + _run_tool(spec, tool_call, lookup_counts)
+    + _emit_checkpoint(spec, payload)
+    + _append_final_message(messages, content)
+    + _append_model_error_placeholder(messages)
+    + _normalize_tool_result(spec, id, name, result)
+    + _drop_orphan_tool_results(messages)
+    + _backfill_missing_tool_results(messages)
+    + _microcompact(messages)
+    + _apply_tool_result_budget(spec, messages)
+    + _snip_history(spec, messages)
+    + _partition_tool_batches(spec, tool_calls)
+}
+
+' ==========================
+' 3. ContextBuilder 类
+' ==========================
+class ContextBuilder {
+    - workspace: 工作目录
+    - timezone: 时区
+    - disabled_skills: 禁用技能列表
+    
+    + __init__(workspace, timezone, disabled_skills)
+    + build_system_prompt(skill_names, channel)
+    + _get_identity(channel)
+    + _build_runtime_context(channel, chat_id, timezone, ...)
+    + _merge_message_content(left, right)
+    + _load_bootstrap_files()
+    + build_messages(history, current_message, ...)
+    + _build_user_content(text, media)
+    + add_tool_result(messages, tool_call_id, tool_name, result)
+    + add_assistant_message(messages, content, ...)
+}
+
+AgentLoop *-- AgentRunner : 组合
+AgentLoop *-- ContextBuilder : 组合
+
+@enduml
