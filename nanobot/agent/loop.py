@@ -471,7 +471,7 @@ class AgentLoop:
                 continue
 
             raw = msg.content.strip()
-            if self.commands.is_priority(raw):
+            if self.commands.is_priority(raw):                                                      # 如果/stop则直接停止
                 ctx = CommandContext(msg=msg, session=None, key=msg.session_key, raw=raw, loop=self)
                 result = await self.commands.dispatch_priority(ctx)
                 if result:
@@ -526,7 +526,7 @@ class AgentLoop:
         self._pending_queues[session_key] = pending
 
         try:
-            async with lock, gate:
+            async with lock, gate:                                                      # 这里控制并发
                 try:
                     on_stream = on_stream_end = None
                     if msg.metadata.get("_wants_stream"):

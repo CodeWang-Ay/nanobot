@@ -1,0 +1,66 @@
+@startuml
+
+
+skinparam class {
+    BackgroundColor #f9f9f9
+    BorderColor #333333
+    FontName Consolas
+}
+skinparam dataclass {
+    BackgroundColor #e6f7ff
+    BorderColor #1890ff
+    FontName Consolas
+}
+skinparam property {
+    FontColor #2c3e50
+}
+skinparam method {
+    FontColor #c0392b
+}
+
+' 导入依赖类型
+' datetime as "datetime"
+' list as "list[str]"
+' dict as "dict[str, Any]"
+' asyncio as "asyncio.Queue"
+' Any as "Any"
+
+' ==================== 数据类 ====================
+class InboundMessage {
+    +channel: str
+    +sender_id: str
+    +chat_id: str
+    +content: str
+    +timestamp: datetime = datetime.now()
+    +media: list[str] = []
+    +metadata: dict[str, Any] = {}
+    +session_key_override: str | None = None
+    +{property} session_key: str
+}
+
+class OutboundMessage {
+    +channel: str
+    +chat_id: str
+    +content: str
+    +reply_to: str | None = None
+    +media: list[str] = []
+    +metadata: dict[str, Any] = {}
+}
+
+' ==================== 核心类 ====================
+class MessageBus {
+    +inbound: asyncio.Queue[InboundMessage]
+    +outbound: asyncio.Queue[OutboundMessage]
+    +__init__()
+    +publish_inbound(msg: InboundMessage)
+    +consume_inbound(): InboundMessage
+    +publish_outbound(msg: OutboundMessage)
+    +consume_outbound(): OutboundMessage
+    +{property} inbound_size: int
+    +{property} outbound_size: int
+}
+
+' ==================== 关系连接 ====================
+MessageBus *-- InboundMessage : 持有/使用
+MessageBus *-- OutboundMessage : 持有/使用
+@enduml

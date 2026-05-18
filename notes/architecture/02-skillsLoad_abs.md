@@ -20,7 +20,6 @@ metadata: {"nanobot":{"always": true, "requires":{"bins":["python"],"env":["API_
 ```
 
 ## 两种加载模式
-
 | 类型 | 加载位置 | 触发条件 |
 |------|----------|----------|
 | **Always Skills** | system_prompt 完整内容 | `metadata.always=true` 且依赖满足 |

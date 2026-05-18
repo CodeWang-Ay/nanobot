@@ -1,0 +1,90 @@
+@startuml Tool 抽象类图
+skinparam class {
+    BackgroundColor #f9f9f9
+    BorderColor #2c3e50
+    AttributeColor #2980b9
+    MethodColor #e74c3c
+}
+skinparam note {
+    BackgroundColor #ecf0f1
+    BorderColor #7f8c8d
+}
+
+class ToolRegistry {
+    - _tools: dict[str, Tool]
+    
+    + __init__()
+    + register(tool)
+    + unregister(name)
+    + get(name)
+    + has(name)
+    + {static} _schema_name(schema)
+    + get_definitions()
+    + prepare_call(name, params)
+    + execute(name, params)
+    + tool_names()
+    + __len__()
+    + __contains__(name)
+}
+
+
+' 抽象类用 abstract 标注
+abstract class Tool {    
+    {static} _resolve_type(t)
+    {abstract} + name()
+    {abstract} + description()
+    {abstract} + parameters()
+    + read_only()
+    + concurrency_safe()
+    + exclusive()
+    {abstract} + execute(**kwargs)
+    + _cast_object(obj, schema)
+    + cast_params(params)
+    + _cast_value(val, schema)
+    + validate_params(params)
+    + to_schema()
+}
+
+class SpawnTool {
+    - manager: SubagentManager
+    + __init__(manager)
+    + set_context(channel, chat_id)
+    + name()
+    + description()
+    + execute(task, label)
+}
+
+class SubagentManager {
+    - provider: LLM提供商
+    - workspace: 工作目录
+    - bus: 消息总线
+    - max_tool_result_chars: int
+    + __init__(provider, workspace, bus, max_tool_result_chars, ...)
+    + spawn(task, label, origin_channel, origin_chat_id, session_key)
+    + _run_subagent(task_id, task, label, origin)
+    + _announce_result(task_id, label, task, result, origin, status)
+    + _format_partial_progress(result)
+    + _build_subagent_prompt()
+    + cancel_by_session(session_key)
+    + get_running_count()
+}
+
+class AgentRunner <<执行引擎>> {
+    - provider: LLMProvider
+
+    + run(spec: AgentRunSpec): AgentRunResult
+    - _request_model(...)
+    - _execute_tools(...)
+    - _snip_history(...)
+    - _microcompact(...)
+}
+
+
+
+' 组合关系
+ToolRegistry *--  Tool: 组合
+SubagentManager  *--  AgentRunner: 组合
+SpawnTool *--  SubagentManager: 组合
+SpawnTool --|> Tool  : 继承tool类
+
+@enduml
