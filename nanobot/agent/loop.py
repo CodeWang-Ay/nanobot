@@ -651,7 +651,7 @@ class AgentLoop:
             self._set_tool_context(channel, chat_id, msg.metadata.get("message_id"))
             # 2. 加载历史消息
             history = session.get_history(max_messages=0)
-            current_role = "assistant" if msg.sender_id == "subagent" else "user"
+            current_role = "assistant" if msg.sender_id == "subagent" else "user"        # 子 Agent 的结果被当作"助手回复"而非"用户消息"
             # 3. 构建上下文（系统提示 + 历史 + 当前消息 + skills元数据）
             messages = self.context.build_messages(
                 history=history,

@@ -78,6 +78,10 @@ class SubagentManager:
         session_key: str | None = None,
     ) -> str:
         """Spawn a subagent to execute a task in the background."""
+
+        logger.info(f"subagent....spawn方法创建...........................{task}")
+
+
         task_id = str(uuid.uuid4())[:8]
         display_label = label or task[:30] + ("..." if len(task) > 30 else "")
         origin = {"channel": origin_channel, "chat_id": origin_chat_id}
