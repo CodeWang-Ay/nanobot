@@ -637,7 +637,7 @@ class Dream:
         """Process unprocessed history entries. Returns True if work was done."""
         from nanobot.agent.skills import BUILTIN_SKILLS_DIR
 
-        last_cursor = self.store.get_last_dream_cursor()
+        last_cursor = self.store.get_last_dream_cursor()                                    # 获取上次处理的游标， 
         entries = self.store.read_unprocessed_history(since_cursor=last_cursor)
         if not entries:
             return False
