@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nanobot 源码解读 · 工具分享</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Noto+Serif+SC:wght@300;400;500;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* 🌊 靛蓝瓷 - 科技/研究/数据分享 */
+    --ink:#0a1f3d;
+    --ink-rgb:10,31,61;
+    --paper:#f1f3f5;
+    --paper-rgb:241,243,245;
+    --paper-tint:#e4e8ec;
+    --ink-tint:#152a4a;
+
+    /* 字体 */
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --serif-en:"Playfair Display","Source Serif 4",Georgia,serif;
+    --serif-body-en:"Source Serif 4",Georgia,serif;
+    --serif-zh:"Noto Serif SC",source-han-serif-sc,serif;
+    --sans-zh:"Noto Sans SC",source-han-sans-sc,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--ink);color:var(--paper);font-family:var(--sans-zh);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+  /* WebGL 双背景 */
+  canvas.bg{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;display:block;transition:opacity 1.2s ease}
+  canvas#bg-light{opacity:0}
+  canvas#bg-dark{opacity:1}
+  body.light-bg canvas#bg-light{opacity:1}
+  body.light-bg canvas#bg-dark{opacity:0}
+  body.low-power canvas.bg{display:none!important}
+
+  /* Deck 容器 + 翻页 */
+  #deck{position:fixed;inset:0;width:2800vw;height:100vh;display:flex;flex-wrap:nowrap;transition:transform .9s cubic-bezier(.77,0,.175,1);z-index:10;will-change:transform}
+  .slide{width:100vw;height:100vh;flex:0 0 100vw;position:relative;padding:6vh 6vw 10vh 6vw;display:flex;flex-direction:column;overflow:hidden}
+  .slide.light{color:var(--ink);background:var(--paper)}
+  .slide.dark{color:var(--paper);background:var(--ink)}
+
+  /* 页面遮罩 */
+  .slide::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;transition:background .7s ease}
+  .slide.light::before{background:rgba(var(--paper-rgb),.78);backdrop-filter:blur(3px)}
+  .slide.dark::before{background:rgba(var(--ink-rgb),.78);backdrop-filter:blur(3px)}
+  .slide.hero.light::before{background:rgba(var(--paper-rgb),.16);backdrop-filter:none}
+  .slide.hero.dark::before{background:rgba(var(--ink-rgb),.12);backdrop-filter:none}
+  .slide.hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none}
+  .slide.hero.light::after{background:linear-gradient(180deg,rgba(var(--paper-rgb),.28) 0%,rgba(var(--paper-rgb),0) 14%,rgba(var(--paper-rgb),0) 86%,rgba(var(--paper-rgb),.28) 100%)}
+  .slide.hero.dark::after{background:linear-gradient(180deg,rgba(var(--ink-rgb),.32) 0%,rgba(var(--ink-rgb),0) 14%,rgba(var(--ink-rgb),0) 86%,rgba(var(--ink-rgb),.32) 100%)}
+
+  /* Magazine chrome */
+  .chrome{display:flex;justify-content:space-between;align-items:flex-start;font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.7}
+  .foot{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.55}
+
+  /* 字体规则 */
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;opacity:.6;margin-bottom:2.6vh}
+  .h-hero{font-family:var(--serif-zh);font-weight:900;font-size:10vw;line-height:.96;letter-spacing:-.02em}
+  .h-xl{font-family:var(--serif-zh);font-weight:700;font-size:6.2vw;line-height:1.08;letter-spacing:-.01em}
+  .h-sub{font-family:var(--serif-zh);font-weight:500;font-size:3.1vw;line-height:1.25;letter-spacing:0;opacity:.7}
+  .h-md{font-family:var(--serif-zh);font-weight:600;font-size:2.3vw;line-height:1.3}
+  .lead{font-family:var(--serif-zh);font-weight:400;font-size:1.75vw;line-height:1.5;opacity:.86}
+  .meta-row{display:flex;gap:1.2em;align-items:baseline;flex-wrap:wrap;font-family:var(--mono);font-size:max(12px,.92vw);letter-spacing:.16em;text-transform:uppercase;opacity:.6}
+
+  /* 布局工具 */
+  .col{display:flex;flex-direction:column;gap:2.4vh}
+  .row{display:flex;align-items:center;gap:3vw}
+  .grid-6{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:4vw 6vw;flex:1;align-content:center;padding:2vh 0}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:4vw;flex:1;align-content:center}
+  .grid-2-7-5{display:grid;grid-template-columns:7fr 5fr;gap:3vw 4vh;align-items:start}
+  .grid-2-6-6{display:grid;grid-template-columns:1fr 1fr;gap:3vw 4vh;align-items:start}
+  .grid-2-8-4{display:grid;grid-template-columns:8fr 4fr;gap:3vw 4vh;align-items:start}
+  .center{align-items:center;justify-content:center;text-align:center}
+  .fill{flex:1}
+
+  /* Frame */
+  .frame{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+
+  /* Stat Card */
+  .stat-card{display:flex;flex-direction:column;gap:.8vh;align-items:flex-start;padding-top:1.6vh;border-top:1px solid currentColor;border-color:rgba(127,127,127,.3)}
+  .stat-card .stat-label{font-family:var(--mono);font-size:max(10px,.78vw);letter-spacing:.24em;text-transform:uppercase;opacity:.55}
+  .stat-card .stat-nb{font-family:var(--serif-en);font-weight:800;font-size:5.8vw;line-height:.9;letter-spacing:-.03em;font-feature-settings:"tnum";margin-top:.4vh}
+  .stat-card .stat-unit{font-family:var(--serif-zh);font-weight:500;font-size:.38em;letter-spacing:0;opacity:.72;margin-left:.14em}
+  .stat-card .stat-note{font-family:var(--sans-zh);font-weight:400;font-size:max(13px,1.05vw);line-height:1.5;opacity:.72;margin-top:.6vh}
+
+  /* Pipeline */
+  .pipeline-section{margin-top:4.4vh;padding-top:2.8vh;border-top:1px dashed rgba(127,127,127,.32)}
+  .pipeline-section:first-of-type{border-top:0;padding-top:0;margin-top:3vh}
+  .pipeline-label{font-family:var(--mono);font-size:max(11px,.85vw);letter-spacing:.24em;text-transform:uppercase;opacity:.62;margin-bottom:2.2vh}
+  .pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:1.2vw}
+  .pipeline[data-cols="3"]{grid-template-columns:repeat(3,1fr)}
+  .pipeline[data-cols="4"]{grid-template-columns:repeat(4,1fr)}
+  .step{display:flex;flex-direction:column;gap:.8vh;padding-top:1.4vh;border-top:1px solid currentColor;border-color:rgba(127,127,127,.35)}
+  .step-nb{font-family:var(--serif-en);font-style:italic;font-weight:500;font-size:1.15vw;opacity:.45}
+  .step-title{font-family:var(--sans-zh);font-weight:700;font-size:1.55vw;letter-spacing:.01em;line-height:1.2}
+  .step-desc{font-family:var(--sans-zh);font-weight:400;font-size:max(12px,.95vw);line-height:1.45;opacity:.72}
+
+  /* Callout */
+  .callout{padding:3vh 2.4vw;border-left:3px solid currentColor;position:relative;font-family:var(--serif-zh);font-size:max(15px,1.2vw);line-height:1.55;opacity:.92}
+  .slide.light .callout{background:rgba(var(--ink-rgb),.05)}
+  .slide.dark .callout{background:rgba(var(--paper-rgb),.06)}
+  .callout-src{display:block;margin-top:1.6vh;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:.6}
+
+  /* 图片 */
+  .frame-img{overflow:hidden;position:relative;background:rgba(0,0,0,.04);box-sizing:border-box;width:100%;border-radius:4px}
+  .slide.dark .frame-img{background:rgba(255,255,255,.04)}
+  .frame-img > img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+  .frame-img.fit-contain > img{object-fit:contain;object-position:center center}
+  .frame-img.r-16x9{aspect-ratio:16/9;max-height:64vh}
+  .frame-img.r-16x10{aspect-ratio:16/10;max-height:56vh}
+  .frame-img.h-22{height:22vh}
+  .frame-img.h-26{height:26vh}
+  .img-cap{display:block;margin-top:.8vh;font-family:var(--mono);font-size:max(10px,.8vw);letter-spacing:.22em;text-transform:uppercase;opacity:.6}
+
+  /* 代码块 */
+  .code-block{font-family:var(--mono);font-size:max(11px,.9vw);line-height:1.6;opacity:.85;padding:2vh 2vw;background:rgba(127,127,127,.08);border-radius:4px;white-space:pre-wrap;overflow-x:auto}
+  .slide.dark .code-block{background:rgba(255,255,255,.06)}
+
+  /* 导航 */
+  #nav{position:fixed;left:50%;bottom:2.6vh;transform:translateX(-50%);z-index:30;display:flex;gap:10px;padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.18);backdrop-filter:blur(10px)}
+  #nav .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3);cursor:pointer;transition:all .3s ease;border:0;padding:0}
+  #nav .dot:hover{background:rgba(255,255,255,.5);transform:scale(1.15)}
+  #nav .dot.active{background:rgba(255,255,255,.95);width:22px;border-radius:999px}
+  body.light-bg #nav{background:rgba(255,255,255,.25)}
+  body.light-bg #nav .dot{background:rgba(var(--ink-rgb),.25)}
+  body.light-bg #nav .dot.active{background:rgba(var(--ink-rgb),.9)}
+  #hint{position:fixed;bottom:3vh;right:3vw;z-index:30;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;opacity:.4;mix-blend-mode:difference;color:#aaa}
+
+  /* 动效 */
+  [data-anim]{opacity:1}
+  body.motion-ready [data-anim]{opacity:0}
+  body.motion-ready [data-anim="left"]{transform:translateX(-24px)}
+  body.motion-ready [data-anim="right"]{transform:translateX(24px)}
+  body.motion-ready [data-anim="line"]{opacity:0;transform:translateY(10px)}
+  body.motion-ready [data-animate="pipeline"] [data-anim]{opacity:.15}
+  body.low-power #deck{transition:none!important}
+  body.low-power *{animation:none!important;transition:none!important}
+  body.low-power.motion-ready [data-anim],body.low-power [data-anim]{opacity:1!important;transform:none!important}
+
+  /* 响应式 */
+  @media (max-width:900px){
+    .h-hero{font-size:14vw}
+    .h-xl{font-size:9vw}
+    .pipeline{grid-template-columns:repeat(2,1fr)}
+    .grid-2-7-5,.grid-2-6-6,.grid-2-8-4{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<script>
+  (function(){
+    const KEY = 'guizang-ppt-low-power';
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const stored = localStorage.getItem(KEY);
+    window.__lowPowerMode = stored === '1' || (stored === null && reduced);
+    function updateHint(){
+      const hint = document.getElementById('hint');
+      if(hint) hint.textContent = `← → 翻页 · B ${window.__lowPowerMode ? '动态' : '静态'} · ESC 索引`;
+    }
+    window.__setLowPowerMode = function(on, opts={}){
+      window.__lowPowerMode = !!on;
+      document.body.classList.toggle('low-power', window.__lowPowerMode);
+      if(opts.persist !== false) localStorage.setItem(KEY, window.__lowPowerMode ? '1' : '0');
+      if(window.__lowPowerMode && document.getAnimations){
+        document.getAnimations().forEach(a=>a.cancel());
+      }
+      updateHint();
+      dispatchEvent(new CustomEvent('ppt-low-power-change', {detail:{on:window.__lowPowerMode}}));
+      if(window.__playSlide) window.__playSlide(window.__currentSlideIndex || 0);
+    };
+    document.body.classList.toggle('low-power', window.__lowPowerMode);
+    addEventListener('DOMContentLoaded', updateHint, {once:true});
+  })();
+</script>
+
+<canvas id="bg-dark" class="bg"></canvas>
+<canvas id="bg-light" class="bg"></canvas>
+<div id="hint">← → 翻页 · B 静态 · ESC 索引</div>
+
+<div id="deck">
+
+<!-- P01 封面 -->
+<section class="slide hero dark">
+  <div class="chrome">
+    <div>源码解读 · 2026.05</div>
+    <div>Vol.01</div>
+  </div>
+  <div class="frame" style="display:grid; gap:4vh; align-content:center; min-height:80vh">
+    <div class="kicker" data-anim>技术分享 · Tech Talk</div>
+    <h1 class="h-hero" data-anim>Nanobot</h1>
+    <h2 class="h-sub" data-anim>源码解读 & 工具分享</h2>
+    <p class="lead" style="max-width:60vw" data-anim>
+      轻量级个人 AI 助手框架：Agent Loop、Skills、Memory、工具系统完整解析
+    </p>
+    <div class="meta-row" data-anim>
+      <span>架构分析</span><span>·</span><span>工具演示</span><span>·</span><span>实践分享</span>
+    </div>
+  </div>
+  <div class="foot">
+    <div>一场关于 AI Agent 框架的深度解读</div>
+    <div>— 2026 —</div>
+  </div>
+</section>
+
+<!-- P02 汇报流程 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>汇报流程 · Agenda</div>
+    <div>02 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:6vh">
+    <div class="kicker" data-anim>三部分 · Three Parts</div>
+    <h2 class="h-xl" data-anim>整体汇报流程</h2>
+    <p class="lead" style="margin-bottom:4vh" data-anim>从源码到工具，完整的 AI Agent 技术栈</p>
+
+    <div class="grid-3" style="margin-top:5vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Part I</div>
+        <div class="stat-nb">01<span class="stat-unit">架构</span></div>
+        <div class="stat-note">Nanobot 源码解读<br>Agent Loop / Skills / Memory<br>工具系统 / Subagent / Bus</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Part II</div>
+        <div class="stat-nb">02<span class="stat-unit">演示</span></div>
+        <div class="stat-note">guizang-ppt-skill<br>现场生成 HTML PPT<br>两套视觉系统展示</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Part III</div>
+        <div class="stat-nb">03<span class="stat-unit">工具</span></div>
+        <div class="stat-note">CC Switch 路由<br>Claude Code Router<br>模型切换实践</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>完整技术栈 · Full Stack</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P03 章节幕封 - Nanobot -->
+<section class="slide hero light">
+  <div class="chrome">
+    <div>第一部分 · Part I</div>
+    <div>Act I · 03 / 28</div>
+  </div>
+  <div class="frame" style="display:grid; gap:6vh; align-content:center; min-height:80vh">
+    <div class="kicker" data-anim>Act I</div>
+    <h1 class="h-hero" style="font-size:8.5vw" data-anim>Nanobot 源码解读</h1>
+    <p class="lead" style="max-width:55vw" data-anim>
+      七大核心模块：Agent Loop、Skills、工具、Memory、Subagent、Bus、Hook
+    </p>
+  </div>
+  <div class="foot">
+    <div>框架架构 · Architecture</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P04 Agent Loop - 什么是 Agent Loop -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Agent Loop · 核心概念</div>
+    <div>04 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:6vh">
+    <div class="kicker" data-anim>概念定义 · Definition</div>
+    <h2 class="h-xl" style="white-space:nowrap" data-anim>什么是 Agent Loop?</h2>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4vw; margin-top:4vh">
+      <div data-anim>
+        <p class="lead" style="margin-bottom:2vh"><span style="opacity:.6">普通 AI：</span>问一句答一句</p>
+        <p style="font-family:var(--sans-zh); font-size:max(14px,1.1vw); line-height:1.6; opacity:.75">
+          问答之间没有连续性，每次对话独立结束
+        </p>
+      </div>
+      <div data-anim>
+        <p class="lead" style="margin-bottom:2vh"><span style="opacity:.6">Agent 系统：</span>目标驱动循环</p>
+        <p style="font-family:var(--sans-zh); font-size:max(14px,1.1vw); line-height:1.6; opacity:.75">
+          给一个目标 → 思考 → 用工具 → 再思考 → 循环直到完成
+        </p>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:5vh" data-anim>
+      "Agent Loop 会自己反复思考、自己决定要不要用工具、用什么工具、看结果、再思考，一直循环到它认为任务完成为止。"
+      <div class="callout-src">— ReAct = Reasoning + Acting</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>Agent Loop · 核心概念</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P05 Agent Loop - 伪代码 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>Agent Loop · 实现逻辑</div>
+    <div>05 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:6vh">
+    <div class="kicker" data-anim>伪代码 · Pseudocode</div>
+    <h2 class="h-xl" data-anim>Agent Loop 核心模式</h2>
+
+    <div class="code-block" style="margin-top:4vh" data-anim>
+while True:
+    response = llm.think(context)      # 思考
+    if response.is_done:
+        return response.answer          # 任务完成，退出
+    tool_result = tools.call(response)  # 调用工具
+    context.add(tool_result)            # 结果加入上下文，进入下一轮
+    </div>
+
+    <div class="pipeline-section">
+      <div class="pipeline-label" data-anim>数据流 · Data Flow</div>
+      <div class="pipeline" data-cols="4">
+        <div class="step" data-anim="step">
+          <div class="step-nb">01</div>
+          <div class="step-title">用户消息</div>
+          <div class="step-desc">输入目标</div>
+        </div>
+        <div class="step" data-anim="step">
+          <div class="step-nb">02</div>
+          <div class="step-title">LLM 思考</div>
+          <div class="step-desc">决定是否用工具</div>
+        </div>
+        <div class="step" data-anim="step">
+          <div class="step-nb">03</div>
+          <div class="step-title">工具执行</div>
+          <div class="step-desc">搜索/写代码/查询</div>
+        </div>
+        <div class="step" data-anim="step">
+          <div class="step-nb">04</div>
+          <div class="step-title">再次思考</div>
+          <div class="step-desc">循环或输出答案</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>ReAct 模式 · 理性 + 行动</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P06 Agent Loop - 实现架构 -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Agent Loop · 类关系</div>
+    <div>06 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>核心类 · Core Classes</div>
+    <h2 class="h-xl" data-anim>三个关键类</h2>
+
+    <div class="grid-3" style="margin-top:5vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">AgentLoop</div>
+        <div class="stat-nb" style="font-size:4vw">loop.py</div>
+        <div class="stat-note">主循环<br>消息消费<br>会话分发</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">AgentRunner</div>
+        <div class="stat-nb" style="font-size:4vw">runner.py</div>
+        <div class="stat-note">LLM 调用<br>工具执行<br>迭代控制</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">ContextBuilder</div>
+        <div class="stat-nb" style="font-size:4vw">context.py</div>
+        <div class="stat-note">System Prompt<br>历史消息<br>Skills 加载</div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:5vh" data-anim>
+      "for iteration in range(spec.max_iterations): 利用 for 循环代替 while 循环，默认 200 次上限"
+      <div class="callout-src">— AgentLoop 的核心设计</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>架构分层 · Layered Architecture</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P07 Agent Loop - 核心流程 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>Agent Loop · 流程详解</div>
+    <div>07 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>调用链 · Call Chain</div>
+    <h2 class="h-xl" data-anim>_process_message 核心</h2>
+
+    <div class="pipeline" style="margin-top:4vh" data-cols="5">
+      <div class="step" data-anim="step">
+        <div class="step-nb">01</div>
+        <div class="step-title">获取会话</div>
+        <div class="step-desc">sessions.get_or_create()</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">02</div>
+        <div class="step-title">加载历史</div>
+        <div class="step-desc">session.get_history()</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">03</div>
+        <div class="step-title">构建上下文</div>
+        <div class="step-desc">context.build_messages()</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">04</div>
+        <div class="step-title">Agent 循环</div>
+        <div class="step-desc">_run_agent_loop()</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">05</div>
+        <div class="step-title">返回响应</div>
+        <div class="step-desc">OutboundMessage</div>
+      </div>
+    </div>
+
+    <div style="margin-top:4vh; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78" data-anim>
+      <p style="margin-bottom:1vh"><strong>commands.py → agent()</strong> → run_interactive() → agent_loop.run()</p>
+      <p><strong>loop.py → run()</strong> → consume_inbound() → _dispatch() → _process_message()</p>
+    </div>
+  </div>
+  <div class="foot">
+    <div>入口 → 主循环 → 处理 → 执行 → 返回</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P08 Skills - 什么是 Skill -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Skills · 技能系统</div>
+    <div>08 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:6vh">
+    <div class="kicker" data-anim>Anthropic 定义 · Definition</div>
+    <h2 class="h-xl" data-anim>什么是 Agent Skill?</h2>
+
+    <p class="lead" style="max-width:65vw; margin-top:3vh" data-anim>
+      基于大模型的智能体模块化能力单元，核心是通过"能力解耦-按需组合-安全校验"闭环，将感知、推理、行动封装为可复用组件。
+    </p>
+
+    <div class="grid-3" style="margin-top:5vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Level 1</div>
+        <div class="stat-nb" style="font-size:3.5vw">元数据</div>
+        <div class="stat-note">始终加载<br>约 100 token<br>name + description</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Level 2</div>
+        <div class="stat-nb" style="font-size:3.5vw">指令</div>
+        <div class="stat-note">触发时加载<br>≤ 5k token<br>SKILL.md 主体</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Level 3</div>
+        <div class="stat-nb" style="font-size:3.5vw">资源</div>
+        <div class="stat-note">按需加载<br>无限制<br>bash 执行文件</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>三级加载 · Token 优化</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P09 Skills - 加载机制 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>Skills · 加载机制</div>
+    <div>09 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>两种模式 · Two Modes</div>
+    <h2 class="h-xl" data-anim>Skills 加载策略</h2>
+
+    <div class="grid-2-6-6" style="margin-top:4vh; gap:3vw">
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="left">
+        <div class="kicker" style="opacity:.9">Always Skills</div>
+        <h3 class="h-md" style="margin-top:2vh">完整加载到 system_prompt</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>metadata.always = true</li>
+          <li>依赖检查通过（bins/env）</li>
+          <li>始终可见，无需触发</li>
+        </ul>
+      </div>
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="right">
+        <div class="kicker" style="opacity:.9">普通 Skills</div>
+        <h3 class="h-md" style="margin-top:2vh">XML 摘要 + 按需加载</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>只放元数据摘要</li>
+          <li>Agent 通过 read_file 加载</li>
+          <li>节省 context token</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "目录结构：nanobot/skills/*/SKILL.md（内置） + workspace/skills/*/SKILL.md（用户，同名覆盖）"
+      <div class="callout-src">— Skills 目录优先级</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>Token 优化 · 按需加载</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P10 Skills - 加载流程 -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Skills · 代码流程</div>
+    <div>10 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>context.py · ContextBuilder</div>
+    <h2 class="h-xl" data-anim>build_system_prompt()</h2>
+
+    <div class="pipeline" style="margin-top:4vh" data-cols="4">
+      <div class="step" data-anim="step">
+        <div class="step-nb">01</div>
+        <div class="step-title">Bootstrap</div>
+        <div class="step-desc">AGENTS.md<br>SOUL.md<br>USER.md</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">02</div>
+        <div class="step-title">Memory</div>
+        <div class="step-desc">MEMORY.md<br>记忆信息</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">03</div>
+        <div class="step-title">Always Skills</div>
+        <div class="step-desc">完整内容<br>依赖检查</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">04</div>
+        <div class="step-title">Skills Summary</div>
+        <div class="step-desc">XML 摘要<br>元数据列表</div>
+      </div>
+    </div>
+
+    <div class="code-block" style="margin-top:4vh; font-size:max(10px,.85vw)" data-anim>
+# SkillsLoader 核心方法
+get_always_skills()         → 返回 always=true 且依赖满足的 skill 名称列表
+load_skills_for_context()   → 加载完整内容，去除 frontmatter
+build_skills_summary()      → 生成所有 skills 的 XML 元数据摘要
+get_skill_metadata()        → 解析 YAML frontmatter
+    </div>
+  </div>
+  <div class="foot">
+    <div>SkillsLoader · 加载器</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P11 工具概述 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>工具系统 · Tools</div>
+    <div>11 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>工具注册 · Registry</div>
+    <h2 class="h-xl" data-anim>ToolRegistry + Tool</h2>
+
+    <div class="grid-3" style="margin-top:4vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">ToolRegistry</div>
+        <div class="stat-nb" style="font-size:3vw">注册管理</div>
+        <div class="stat-note">_tools[key:value]<br>工具名称 → Tool 对象<br>get_definitions()</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Tool 基类</div>
+        <div class="stat-nb" style="font-size:3vw">统一接口</div>
+        <div class="stat-note">name / description<br>parameters / execute()<br>to_schema()</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Schema DSL</div>
+        <div class="stat-nb" style="font-size:3vw">参数定义</div>
+        <div class="stat-note">StringSchema<br>IntegerSchema<br>ObjectSchema</div>
+      </div>
+    </div>
+
+    <div style="margin-top:3vh; font-family:var(--mono); font-size:max(11px,.9vw); opacity:.7" data-anim>
+nanobot/agent/tools/ → cron.py, filesystem.py, mcp.py, shell.py, web.py, spawn.py...
+    </div>
+  </div>
+  <div class="foot">
+    <div>工具目录 · Tool Directory</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P12 工具注册流程 -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>工具系统 · 注册时机</div>
+    <div>12 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>AgentLoop 初始化 · Init</div>
+    <h2 class="h-xl" data-anim>工具注册时机</h2>
+
+    <div class="pipeline" style="margin-top:4vh" data-cols="4">
+      <div class="step" data-anim="step">
+        <div class="step-nb">01</div>
+        <div class="step-title">AgentLoop.__init__</div>
+        <div class="step-desc">创建 ToolRegistry</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">02</div>
+        <div class="step-title">_register_default_tools</div>
+        <div class="step-desc">依次注册工具</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">03</div>
+        <div class="step-title">tools.register()</</div>
+        <div class="step-desc">添加到 _tools dict</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">04</div>
+        <div class="step-title">get_definitions()</div>
+        <div class="step-desc">转换为 JSON Schema</div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "LLM 调用时：spec.tools.get_definitions() → Tool 对象转换为 OpenAI Function Calling API 兼容的 JSON 格式"
+      <div class="callout-src">— 工具定义传递给 LLM</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>注册 → 调用 → 执行</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P13 工具 Schema DSL -->
+<section class="slide light">
+  <div class="chrome">
+    <div>工具系统 · Schema DSL</div>
+    <div>13 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>定义工具 · Define Tool</div>
+    <h2 class="h-xl" data-anim>如何添加自定义工具</h2>
+
+    <div class="code-block" style="margin-top:3vh" data-anim>
+@tool_parameters(
+    tool_parameters_schema(
+        material_id=StringSchema("要查询的物料编号", min_length=1),
+        required=["material_id"],
+    )
+)
+class MyTool(Tool):
+    @property
+    def name(self) -> str:
+        return "my_tool"
+    @property
+    def description(self) -> str:
+        return "工具的具体描述"
+    async def execute(self, material_id: str) -> str:
+        return "函数调用结果"
+    </div>
+
+    <div style="margin-top:3vh; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78" data-anim>
+      <strong>Schema DSL</strong>：用 Python 对象替代手写 JSON Schema，IDE 支持、避免错误、内置验证
+    </div>
+  </div>
+  <div class="foot">
+    <div>Python DSL → JSON Schema</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P14 Memory - 三层架构 -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Memory · 记忆系统</div>
+    <div>14 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>三层架构 · Three Layers</div>
+    <h2 class="h-xl" data-anim>Memory 机制</h2>
+
+    <div class="grid-3" style="margin-top:5vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">MemoryStore</div>
+        <div class="stat-nb" style="font-size:3vw">存储层</div>
+        <div class="stat-note">每次对话<br>写入 history.jsonl<br>append_history()</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Consolidator</div>
+        <div class="stat-nb" style="font-size:3vw">实时压缩</div>
+        <div class="stat-note">token 超限触发<br>LLM 摘要合并<br>降到预算 50%</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Dream</div>
+        <div class="stat-nb" style="font-size:3vw">定时整理</div>
+        <div class="stat-note">cron 驱动<br>更新长期记忆<br>USER/MEMORY/SOUL</div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "Session history + auto-compact 是被动防御（token 压力驱动），Dream consolidation 是主动提炼（时间驱动）"
+      <div class="callout-src">— 两套机制互补</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>记忆三层 · Memory Layers</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P15 Consolidator -->
+<section class="slide light">
+  <div class="chrome">
+    <div>Memory · Consolidator</div>
+    <div>15 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>token 压缩 · Token Compression</div>
+    <h2 class="h-xl" data-anim>Consolidator 压缩流程</h2>
+
+    <div class="pipeline" style="margin-top:4vh" data-cols="5">
+      <div class="step" data-anim="step">
+        <div class="step-nb">01</div>
+        <div class="step-title">计算预算</div>
+        <div class="step-desc">budget = context_window - completion - buffer</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">02</div>
+        <div class="step-title">估算 token</div>
+        <div class="step-desc">estimate_session_prompt_tokens()</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">03</div>
+        <div class="step-title">判断超限</div>
+        <div class="step-desc">estimated > budget?</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">04</div>
+        <div class="step-title">循环压缩</div>
+        <div class="step-desc">最多 5 轮 → target = 50%</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">05</div>
+        <div class="step-title">archive()</div>
+        <div class="step-desc">LLM 摘要 → history.jsonl</div>
+      </div>
+    </div>
+
+    <div style="margin-top:3vh; font-family:var(--mono); font-size:max(10px,.85vw); opacity:.7" data-anim>
+示例：65536 - 8192 - 1024 = 56320 budget → 超限后降到 28160 (50%)
+    </div>
+  </div>
+  <div class="foot">
+    <div>Token 预算 · Budget Control</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P16 Dream -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Memory · Dream</div>
+    <div>16 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>中期到长期 · Long-term Memory</div>
+    <h2 class="h-xl" data-anim>Dream 定时整理</h2>
+
+    <div class="grid-2-6-6" style="margin-top:4vh; gap:3vw">
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="left">
+        <div class="kicker" style="opacity:.9">触发方式</div>
+        <h3 class="h-md" style="margin-top:2vh">两种触发</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>自动：cron 定时（默认 2h）</li>
+          <li>手动：/dream 命令</li>
+        </ul>
+      </div>
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="right">
+        <div class="kicker" style="opacity:.9">两阶段处理</div>
+        <h3 class="h-md" style="margin-top:2vh">Phase 1 + Phase 2</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>Phase 1：分析该改什么</li>
+          <li>Phase 2：执行文件修改</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "history.jsonl → 更新 USER.md / MEMORY.md / SOUL.md / skills"
+      <div class="callout-src">— 长期记忆持续进化</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>Dream · 记忆升华</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P17 Subagent -->
+<section class="slide light">
+  <div class="chrome">
+    <div>Subagent · 子代理</div>
+    <div>17 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>后台任务 · Background Tasks</div>
+    <h2 class="h-xl" data-anim>Subagent 用法</h2>
+
+    <div class="pipeline" style="margin-top:4vh" data-cols="4">
+      <div class="step" data-anim="step">
+        <div class="step-nb">01</div>
+        <div class="step-title">SpawnTool.execute()</div>
+        <div class="step-desc">用户请求后台任务</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">02</div>
+        <div class="step-title">SubagentManager.spawn()</div>
+        <div class="step-desc">创建 asyncio.Task</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">03</div>
+        <div class="step-title">_run_subagent()</div>
+        <div class="step-desc">独立 AgentRunner</div>
+      </div>
+      <div class="step" data-anim="step">
+        <div class="step-nb">04</div>
+        <div class="step-title">_announce_result()</div>
+        <div class="step-desc">MessageBus 通知主 Agent</div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "单层派生设计：Subagent 工具列表不注册 SpawnTool，避免任务树爆炸、简化管理"
+      <div class="callout-src">— 不可嵌套，资源可控</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>Spawn → Run → Notify</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P18 Bus -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Bus · 消息总线</div>
+    <div>18 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>消息队列 · Message Queue</div>
+    <h2 class="h-xl" data-anim>MessageBus 用法</h2>
+
+    <div class="grid-3" style="margin-top:4vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">InboundMessage</div>
+        <div class="stat-nb" style="font-size:3vw">入站</div>
+        <div class="stat-note">channel / sender_id<br>chat_id / content<br>metadata</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">OutboundMessage</div>
+        <div class="stat-nb" style="font-size:3vw">出站</div>
+        <div class="stat-note">响应内容<br>发送到渠道<br>metadata</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">MessageBus</div>
+        <div class="stat-nb" style="font-size:3vw">队列</div>
+        <div class="stat-note">publish_inbound()<br>consume_inbound()<br>publish_outbound()</div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "解耦聊天渠道与 Agent 核心：asyncio 深度应用，实现异步、队列、随时打断"
+      <div class="callout-src">— Bus 负责消息流调度</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>入站 → Agent → 出站</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P19 章节幕封 - guizang-ppt-skill -->
+<section class="slide hero dark">
+  <div class="chrome">
+    <div>第二部分 · Part II</div>
+    <div>Act II · 19 / 28</div>
+  </div>
+  <div class="frame" style="display:grid; gap:6vh; align-content:center; min-height:80vh">
+    <div class="kicker" data-anim>Act II</div>
+    <h1 class="h-hero" style="font-size:7.5vw" data-anim>guizang-ppt-skill</h1>
+    <p class="lead" style="max-width:55vw" data-anim>
+      现场演示：用 Skill 生成 HTML 演示文稿，两套视觉系统实时展示
+    </p>
+  </div>
+  <div class="foot">
+    <div>Skill 演示 · Live Demo</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P20 Skill 解决什么问题 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>guizang-ppt-skill · 核心价值</div>
+    <div>20 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:6vh">
+    <div class="kicker" data-anim>问题 · Problem</div>
+    <h2 class="h-xl" data-anim>解决什么问题?</h2>
+
+    <p class="lead" style="max-width:60vw; margin-top:3vh" data-anim>
+      AI 做出来的 PPT 通常又丑又平庸。这个 Skill 把真实演讲者的审美标准、布局规范、质量检查清单全部编码进去。
+    </p>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "生成的 HTML 演示文稿直接达到'编辑级'视觉水准，而不是默认的'商务模板'风格"
+      <div class="callout-src">— Monocle 杂志 × 代码</div>
+    </div>
+
+    <div style="margin-top:4vh; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78" data-anim>
+      <strong>输出格式</strong>：单文件 HTML，WebGL 背景 + Motion One 动效 + 横向翻页
+    </div>
+  </div>
+  <div class="foot">
+    <div>编辑级视觉 · Editorial Quality</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P21 两套视觉系统 -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>guizang-ppt-skill · 视觉系统</div>
+    <div>21 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>两套风格 · Two Styles</div>
+    <h2 class="h-xl" data-anim>视觉系统选择</h2>
+
+    <div class="grid-2-6-6" style="margin-top:4vh; gap:3vw">
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="left">
+        <div class="kicker" style="opacity:.9">风格 A · 电子杂志</div>
+        <h3 class="h-md" style="margin-top:2vh">衬线 + 流体背景</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>Noto Serif SC 标题</li>
+          <li>WebGL 流体/色散背景</li>
+          <li>暖色调 5 套主题</li>
+          <li>适合：人文/故事/分享</li>
+        </ul>
+      </div>
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="right">
+        <div class="kicker" style="opacity:.9">风格 B · 瑞士国际主义</div>
+        <h3 class="h-md" style="margin-top:2vh">无衬线 + 网格点阵</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>Inter / Helvetica</li>
+          <li>极致字号对比</li>
+          <li>IKB 蓝/柠檬黄/橙</li>
+          <li>适合：数据/工程/产品</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>杂志 × 瑞士 · Magazine × Swiss</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P22 章节幕封 - 工具介绍 -->
+<section class="slide hero light">
+  <div class="chrome">
+    <div>第三部分 · Part III</div>
+    <div>Act III · 22 / 28</div>
+  </div>
+  <div class="frame" style="display:grid; gap:6vh; align-content:center; min-height:80vh">
+    <div class="kicker" data-anim>Act III</div>
+    <h1 class="h-hero" style="font-size:7.5vw" data-anim>工具介绍</h1>
+    <p class="lead" style="max-width:55vw" data-anim>
+      CC Switch 路由模式 + Claude Code Router，解锁更多模型选择
+    </p>
+  </div>
+  <div class="foot">
+    <div>工具分享 · Tool Sharing</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P23 CC Switch 功能 -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>CC Switch · 功能概览</div>
+    <div>23 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>All-in-One · 一站管理</div>
+    <h2 class="h-xl" data-anim>CC Switch 是什么?</h2>
+
+    <p class="lead" style="max-width:60vw; margin-top:3vh" data-anim>
+      跨平台桌面端工具，管理 Claude Code、Codex、Gemini CLI 等多个 AI 编程 CLI 工具
+    </p>
+
+    <div class="grid-6" style="margin-top:4vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">CLI 管理</div>
+        <div class="stat-nb" style="font-size:3vw">6+</div>
+        <div class="stat-note">Claude Code / Codex<br>Gemini CLI / OpenCode</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">供应商预设</div>
+        <div class="stat-nb" style="font-size:3vw">50+</div>
+        <div class="stat-note">AWS Bedrock / NVIDIA NIM<br>社区中转服务</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">一键切换</div>
+        <div class="stat-nb" style="font-size:3vw">热更新</div>
+        <div class="stat-note">可视化界面<br>立即生效无需重启</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">MCP 管理</div>
+        <div class="stat-nb" style="font-size:3vw">统一</div>
+        <div class="stat-note">四个应用 MCP<br>双向同步</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">托盘菜单</div>
+        <div class="stat-nb" style="font-size:3vw">快速</div>
+        <div class="stat-note">即时切换供应商<br>无需打开完整应用</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">路由模式</div>
+        <div class="stat-nb" style="font-size:3vw">核心</div>
+        <div class="stat-note">OpenAI 格式 API<br>DeepSeek / 硅基流动</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>GitHub: farion1231/cc-switch</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P24 CC Switch 路由模式 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>CC Switch · 路由模式</div>
+    <div>24 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>核心亮点 · Key Feature</div>
+    <h2 class="h-xl" data-anim>路由模式</h2>
+
+    <p class="lead" style="max-width:60vw; margin-top:3vh" data-anim>
+      让 Claude Code 直接使用 OpenAI 兼容格式 API，解锁 DeepSeek、硅基流动、Gemini 等更多模型
+    </p>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "切换配置热更新，切换之后立即生效，无需退出 cc"
+      <div class="callout-src">— 路由模式核心优势</div>
+    </div>
+
+    <div style="margin-top:3vh; font-family:var(--mono); font-size:max(11px,.9vw); opacity:.7" data-anim>
+注意：Anthropic 格式 → https://coding.dashscope.aliyuncs.com/apps/anthropic
+OpenAI 格式 → https://coding.dashscope.aliyuncs.com/v1（不要写全路径）
+    </div>
+  </div>
+  <div class="foot">
+    <div>Claude Code → OpenAI API</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P25 Claude Code Router -->
+<section class="slide dark">
+  <div class="chrome">
+    <div>Claude Code Router · 路由器</div>
+    <div>25 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>开源路由 · Open Router</div>
+    <h2 class="h-xl" data-anim>Claude Code Router</h2>
+
+    <p class="lead" style="max-width:60vw; margin-top:3vh" data-anim>
+      将 Claude Code 的请求转发到其他兼容 OpenAI API 格式的模型服务
+    </p>
+
+    <div class="grid-3" style="margin-top:4vh">
+      <div class="stat-card" data-anim>
+        <div class="stat-label">多模型路由</div>
+        <div class="stat-nb" style="font-size:3vw">配置</div>
+        <div class="stat-note">多个提供商<br>按需切换</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">请求转发</div>
+        <div class="stat-nb" style="font-size:3vw">转换</div>
+        <div class="stat-note">Anthropic → OpenAI<br>统一格式</div>
+      </div>
+      <div class="stat-card" data-anim>
+        <div class="stat-label">Web 界面</div>
+        <div class="stat-nb" style="font-size:3vw">可视</div>
+        <div class="stat-note">配置管理<br>日志调试</div>
+      </div>
+    </div>
+
+    <div style="margin-top:3vh; font-family:var(--mono); font-size:max(11px,.9vw); opacity:.7" data-anim>
+ccr code → 启动带路由配置的 Claude Code | ccr restart → 重启生效 | ccr ui → 管理界面
+    </div>
+  </div>
+  <div class="foot">
+    <div>GitHub: musistudio/claude-code-router</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P26 Router vs Switch 对比 -->
+<section class="slide light">
+  <div class="chrome">
+    <div>对比 · Comparison</div>
+    <div>26 / 28</div>
+  </div>
+  <div class="frame" style="padding-top:5vh">
+    <div class="kicker" data-anim>两个工具 · Two Tools</div>
+    <h2 class="h-xl" data-anim>Router vs Switch</h2>
+
+    <div class="grid-2-6-6" style="margin-top:4vh; gap:3vw">
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="left">
+        <div class="kicker" style="opacity:.9">Claude Code Router</div>
+        <h3 class="h-md" style="margin-top:2vh">CLI 专用</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>针对 Claude Code 用户</li>
+          <li>命令行启动</li>
+          <li>配置需重启生效</li>
+          <li>轻量级</li>
+        </ul>
+      </div>
+      <div style="padding:3vh 2vw; border-left:3px solid currentColor" data-anim="right">
+        <div class="kicker" style="opacity:.9">CC Switch</div>
+        <h3 class="h-md" style="margin-top:2vh">桌面 All-in-One</h3>
+        <ul style="margin-top:2vh; padding-left:1.2em; font-family:var(--sans-zh); font-size:max(13px,1vw); line-height:1.6; opacity:.78">
+          <li>管理多个 CLI 工具</li>
+          <li>可视化界面</li>
+          <li>热更新切换</li>
+          <li>统一 MCP/Skills 管理</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:4vh" data-anim>
+      "Router 更轻量专注，Switch 功能更全面，按需选择"
+      <div class="callout-src">— 工具选型建议</div>
+    </div>
+  </div>
+  <div class="foot">
+    <div>功能对比 · Feature Compare</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P27 收束 - Takeaway -->
+<section class="slide hero dark">
+  <div class="chrome">
+    <div>收束 · Takeaway</div>
+    <div>27 / 28</div>
+  </div>
+  <div class="frame" style="display:grid; gap:5vh; align-content:center; min-height:80vh">
+    <div class="kicker" data-anim>The Takeaway</div>
+    <h1 class="h-hero" style="font-size:6.5vw; line-height:1.2" data-anim>
+      <span data-anim style="display:block">Nanobot = 轻量级</span>
+      <span data-anim style="display:block">Agent 框架范式</span>
+    </h1>
+    <p class="lead" style="max-width:50vw" data-anim>
+      Agent Loop + Skills + Memory + 工具系统，完整的技术栈参考
+    </p>
+    <div class="meta-row" data-anim>
+      <span>感谢聆听</span><span>·</span><span>2026.05</span>
+    </div>
+  </div>
+  <div class="foot">
+    <div>框架学习 · Framework Learning</div>
+    <div>— · —</div>
+  </div>
+</section>
+
+<!-- P28 结尾 -->
+<section class="slide hero light">
+  <div class="chrome">
+    <div>结束 · End</div>
+    <div>28 / 28</div>
+  </div>
+  <div class="frame" style="display:grid; gap:6vh; align-content:center; min-height:80vh">
+    <div class="kicker" data-anim>Q&A</div>
+    <h1 class="h-hero" style="font-size:8vw" data-anim>谢谢</h1>
+    <p class="lead" style="max-width:55vw" data-anim>
+      欢迎提问与讨论
+    </p>
+  </div>
+  <div class="foot">
+    <div>技术分享 · Tech Talk</div>
+    <div>— 2026 —</div>
+  </div>
+</section>
+
+</div>
+
+<div id="nav"></div>
+
+<script>
+/* WebGL 双背景 */
+const VS = `attribute vec2 position;void main(){gl_Position=vec4(position,0.0,1.0);}`;
+
+const FS_DARK = `precision highp float;
+uniform vec2 u_resolution;uniform float u_time;uniform vec2 u_mouse;
+vec3 palette(float t,vec3 a,vec3 b,vec3 c,vec3 d){return a+b*cos(6.28318*(c*t+d));}
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_resolution.xy;
+  vec2 p=uv*2.0-1.0;p.x*=u_resolution.x/u_resolution.y;
+  vec2 m=u_mouse*2.0-1.0;m.x*=u_resolution.x/u_resolution.y;
+  float md=length(p-m);
+  float mr=sin(md*15.0-u_time*4.0)*exp(-md*3.0);p+=mr*0.08;
+  vec2 p0=p;
+  for(float i=1.0;i<4.0;i++){
+    p.x+=0.1/i*sin(i*3.0*p.y+u_time*0.4)+0.05;
+    p.y+=0.1/i*cos(i*2.0*p.x+u_time*0.3)-0.05;
+  }
+  float r=length(p);float ang=atan(p.y,p.x);
+  vec3 a=vec3(0.12,0.12,0.13);
+  vec3 b=vec3(0.03,0.04,0.05);
+  vec3 c=vec3(1.0,1.0,1.0);
+  vec3 d=vec3(0.1,0.2,0.4);
+  vec3 col=palette(r*1.5+p0.x*0.5+u_time*0.1,a,b,c,d);
+  float disp=sin(r*25.0-u_time*1.5+ang*2.0)*0.5+0.5;
+  col+=vec3(disp*0.015,disp*0.01,disp*0.02);
+  float hi=pow(sin(p.x*4.0+p.y*3.0+u_time)*0.5+0.5,8.0);
+  col+=hi*0.08;
+  vec3 base=vec3(0.05,0.05,0.06);
+  col=mix(base,col,0.85);
+  gl_FragColor=vec4(col,1.0);
+}`;
+
+const FS_LIGHT = `precision highp float;
+uniform vec2 u_resolution;uniform float u_time;uniform vec2 u_mouse;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){
+  vec2 i=floor(p),f=fract(p);
+  float a=hash(i),b=hash(i+vec2(1,0));
+  float c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));
+  vec2 u=f*f*(3.0-2.0*f);
+  return mix(a,b,u.x)+(c-a)*u.y*(1.0-u.x)+(d-b)*u.x*u.y;
+}
+float fbm(vec2 p){
+  float v=0.0,a=0.5;
+  mat2 m=mat2(0.80,0.60,-0.60,0.80);
+  for(int i=0;i<5;i++){v+=a*noise(p);p=m*p*2.02;a*=0.5;}
+  return v;
+}
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_resolution.xy;
+  vec2 p=uv;p.x*=u_resolution.x/u_resolution.y;
+  vec2 m=u_mouse;m.x*=u_resolution.x/u_resolution.y;
+  vec2 md=p-m;float dl=length(md);
+  p+=normalize(md+vec2(0.0001))*exp(-dl*5.0)*0.03;
+  vec2 q=vec2(fbm(p*1.8+u_time*0.07),fbm(p*1.8+vec2(5.2,1.3)+u_time*0.06));
+  vec2 r=vec2(fbm(p*2.0+q*1.3+vec2(1.7,9.2)+u_time*0.05),
+              fbm(p*2.0+q*1.3+vec2(8.3,2.8)+u_time*0.04));
+  float f=fbm(p*2.2+r*1.5);
+  vec3 silverDark=vec3(0.86,0.85,0.84);
+  vec3 paper=vec3(0.955,0.945,0.925);
+  vec3 col=mix(silverDark,paper,f);
+  float ph=r.x*2.2+u_time*0.35;
+  col+=vec3(0.78,0.62,0.92)*sin(ph)*0.055;
+  col+=vec3(0.55,0.72,0.95)*sin(ph*0.8+2.0)*0.05;
+  float hl=smoothstep(0.48,0.92,f);
+  col+=hl*0.06;
+  gl_FragColor=vec4(col,1.0);
+}`;
+
+const mouse={x:0.5,y:0.5};
+addEventListener('mousemove',e=>{mouse.x=e.clientX/innerWidth;mouse.y=e.clientY/innerHeight});
+
+function bootGL(canvasId, fsSrc){
+  const canvas=document.getElementById(canvasId);
+  const gl=canvas.getContext('webgl',{alpha:false,antialias:true});
+  if(!gl) return ()=>false;
+  const mk=(t,s)=>{const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);return sh};
+  const prog=gl.createProgram();
+  gl.attachShader(prog,mk(gl.VERTEX_SHADER,VS));
+  gl.attachShader(prog,mk(gl.FRAGMENT_SHADER,fsSrc));
+  gl.linkProgram(prog);gl.useProgram(prog);
+  const buf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+  const pos=gl.getAttribLocation(prog,'position');
+  gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+  const lRes=gl.getUniformLocation(prog,'u_resolution');
+  const lT=gl.getUniformLocation(prog,'u_time');
+  const lM=gl.getUniformLocation(prog,'u_mouse');
+  const resize=()=>{
+    const d=Math.min(window.devicePixelRatio||1,2);
+    canvas.width=innerWidth*d;canvas.height=innerHeight*d;
+    gl.viewport(0,0,canvas.width,canvas.height);
+  };
+  addEventListener('resize',resize);resize();
+  return (tSec)=>{
+    gl.uniform2f(lRes,canvas.width,canvas.height);
+    gl.uniform1f(lT,tSec);
+    gl.uniform2f(lM,mouse.x,1-mouse.y);
+    gl.drawArrays(gl.TRIANGLES,0,6);
+    return true;
+  };
+}
+let drawDark=null, drawLight=null, glRAF=0, glT0=Date.now();
+function startGL(){
+  if(window.__lowPowerMode || glRAF) return;
+  if(!drawDark) drawDark=bootGL('bg-dark',FS_DARK);
+  if(!drawLight) drawLight=bootGL('bg-light',FS_LIGHT);
+  glT0=Date.now();
+  function loop(){
+    if(window.__lowPowerMode){glRAF=0;return;}
+    const t=(Date.now()-glT0)/1000;
+    drawDark(t);drawLight(t);
+    glRAF=requestAnimationFrame(loop);
+  }
+  glRAF=requestAnimationFrame(loop);
+}
+function stopGL(){
+  if(glRAF) cancelAnimationFrame(glRAF);
+  glRAF=0;
+}
+startGL();
+addEventListener('ppt-low-power-change', e=>{e.detail.on ? stopGL() : startGL();});
+
+// 导航
+const deck=document.getElementById('deck');
+const slides=deck.querySelectorAll('.slide');
+const nav=document.getElementById('nav');
+let idx=0,total=slides.length,lock=false;
+
+deck.style.width=(total*100)+'vw';
+
+slides.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.className='dot';b.dataset.i=i;b.setAttribute('aria-label','Page '+(i+1));
+  b.onclick=()=>go(i);
+  nav.appendChild(b);
+});
+
+function go(n){
+  if(lock)return;
+  idx=Math.max(0,Math.min(total-1,n));
+  window.__currentSlideIndex = idx;
+  deck.style.transform=`translateX(${-idx*100}vw)`;
+  nav.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===idx));
+  const el=slides[idx];
+  const th=el.dataset.theme || (el.classList.contains('light')?'light':(el.classList.contains('dark')?'dark':'dark'));
+  document.body.classList.toggle('light-bg',th==='light');
+  if(window.__playSlide) setTimeout(()=>window.__playSlide(idx), 450);
+  lock=true;setTimeout(()=>lock=false,700);
+}
+
+// ESC 索引视图
+let overviewOn=false;
+const ov=document.createElement('div');
+ov.id='overview';
+ov.style.cssText='position:fixed;inset:0;z-index:100;background:rgba(var(--ink-rgb),.92);backdrop-filter:blur(12px);display:none;overflow-y:auto;padding:4vh 4vw';
+document.body.appendChild(ov);
+
+function buildOverview(){
+  ov.innerHTML='';
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:2vh 1.6vw;max-width:90vw;margin:0 auto';
+  slides.forEach((s,i)=>{
+    const card=document.createElement('div');
+    card.style.cssText='cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid '+(i===idx?'rgba(var(--paper-rgb),.8)':'rgba(var(--paper-rgb),.15)')+';transition:border-color .2s';
+    card.onmouseenter=()=>card.style.borderColor='rgba(var(--paper-rgb),.6)';
+    card.onmouseleave=()=>card.style.borderColor=i===idx?'rgba(var(--paper-rgb),.8)':'rgba(var(--paper-rgb),.15)';
+    const wrap=document.createElement('div');
+    wrap.style.cssText='width:100%;aspect-ratio:16/9;overflow:hidden;position:relative;pointer-events:none;background:'+(s.classList.contains('light')?'var(--paper)':'var(--ink)');
+    const clone=s.cloneNode(true);
+    clone.style.cssText='width:100vw;height:100vh;transform:scale('+(1/4.5)+');transform-origin:top left;position:absolute;top:0;left:0;pointer-events:none';
+    wrap.appendChild(clone);
+    const label=document.createElement('div');
+    label.style.cssText='padding:6px 10px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--paper);opacity:.7';
+    label.textContent=(i+1)+' / '+total;
+    card.appendChild(wrap);
+    card.appendChild(label);
+    card.onclick=()=>{toggleOverview();go(i)};
+    grid.appendChild(card);
+  });
+  ov.appendChild(grid);
+}
+
+function toggleOverview(){
+  overviewOn=!overviewOn;
+  if(overviewOn){buildOverview();ov.style.display='block';}
+  else{ov.style.display='none';}
+}
+
+addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();toggleOverview();return;}
+  if(e.key && e.key.toLowerCase()==='b' && !e.metaKey && !e.ctrlKey && !e.altKey){
+    e.preventDefault();
+    window.__setLowPowerMode(!window.__lowPowerMode);
+    return;
+  }
+  if(overviewOn)return;
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '||e.key==='ArrowDown'){
+    if(window.__pipeAdvance && window.__pipeAdvance()) return;
+    go(idx+1);
+    return;
+  }
+  if(e.key==='ArrowLeft'||e.key==='PageUp'||e.key==='ArrowUp')go(idx-1);
+  if(e.key==='Home')go(0);
+  if(e.key==='End')go(total-1);
+});
+
+let wheelTO=null,wheelAcc=0;
+addEventListener('wheel',e=>{
+  wheelAcc+=e.deltaY+e.deltaX;
+  if(Math.abs(wheelAcc)>50){
+    if(wheelAcc>0 && window.__pipeAdvance && window.__pipeAdvance()){
+      wheelAcc=0;
+    }else{
+      go(idx+(wheelAcc>0?1:-1));wheelAcc=0;
+    }
+  }
+  clearTimeout(wheelTO);wheelTO=setTimeout(()=>wheelAcc=0,150);
+},{passive:true});
+
+let tx=0,ty=0;
+addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
+addEventListener('touchend',e=>{
+  const dx=(e.changedTouches[0].clientX-tx);
+  const dy=(e.changedTouches[0].clientY-ty);
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){
+    if(dx<0 && window.__pipeAdvance && window.__pipeAdvance()) return;
+    go(idx+(dx<0?1:-1));
+  }
+},{passive:true});
+
+go(0);
+</script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>lucide.createIcons();</script>
+
+<script type="module">
+let motion;
+try {
+  motion = await import('./assets/motion.min.js');
+} catch(e1) {
+  try {
+    motion = await import('https://cdn.jsdelivr.net/npm/motion@11.11.17/+esm');
+  } catch(e2) {
+    console.warn('[motion] local + CDN both failed', e1, e2);
+    document.querySelectorAll('[data-anim]').forEach(el=>{el.style.opacity='1';el.style.transform='none'});
+    document.querySelectorAll('[data-animate="pipeline"] [data-anim]').forEach(el=>el.style.opacity='1');
+  }
+}
+
+if(motion){
+  const { animate, stagger } = motion;
+  document.body.classList.add('motion-ready');
+  const EASE = [.22, 1, .36, 1];
+  const slides = [...document.querySelectorAll('.slide')];
+  let pipeStep = -1;
+  let lastIdx = -1;
+
+  function resetAnims(slide){
+    slide.querySelectorAll('[data-anim]').forEach(el=>{
+      el.style.opacity='';
+      el.style.transform='';
+    });
+  }
+
+  function revealStatic(slide){
+    resetAnims(slide);
+    document.getAnimations?.().forEach(a=>a.cancel());
+    slide.querySelectorAll('[data-anim]').forEach(el=>{
+      el.style.opacity='1';
+      el.style.transform='none';
+    });
+  }
+
+  function playSlide(i){
+    const slide = slides[i];
+    if(!slide) return;
+    lastIdx = i;
+    const recipe = slide.dataset.animate || (slide.classList.contains('hero') ? 'hero' : 'cascade');
+
+    if(window.__lowPowerMode){
+      revealStatic(slide);
+      return;
+    }
+
+    if(recipe === 'pipeline'){
+      pipeStep = -1;
+      slide.querySelectorAll('[data-anim]').forEach(el=>{
+        el.style.opacity='0.15';
+        el.style.transform='none';
+      });
+      return;
+    }
+
+    resetAnims(slide);
+    const all = [...slide.querySelectorAll('[data-anim]')];
+    if(!all.length) return;
+
+    if(recipe === 'directional'){
+      const lefts  = all.filter(el=>el.dataset.anim==='left');
+      const divs   = all.filter(el=>el.dataset.anim==='divider');
+      const rights = all.filter(el=>el.dataset.anim==='right');
+      const others = all.filter(el=>!['left','right','divider'].includes(el.dataset.anim));
+      if(others.length) animate(others, {opacity:[0,1], y:[12,0]}, {duration:.6, delay:stagger(.1, {start:.15}), easing:EASE});
+      if(lefts.length)  animate(lefts,  {opacity:[0,1], x:[-24,0]}, {duration:.8, delay:.35, easing:EASE});
+      if(divs.length)   animate(divs,   {opacity:[0,.25]},          {duration:.5, delay:.9});
+      if(rights.length) animate(rights, {opacity:[0,1], x:[24,0]},  {duration:.8, delay:1.0, easing:EASE});
+      return;
+    }
+
+    if(recipe === 'hero'){
+      animate(all, {opacity:[0,1], y:[14,0]}, {duration:.9, delay:stagger(.16, {start:.2}), easing:EASE});
+      return;
+    }
+
+    // default: cascade
+    animate(all, {opacity:[0,1], y:[16,0]}, {duration:.75, delay:stagger(.1, {start:.15}), easing:EASE});
+  }
+
+  function pipeAdvance(){
+    if(window.__lowPowerMode) return false;
+    const slide = slides[lastIdx];
+    if(!slide || slide.dataset.animate !== 'pipeline') return false;
+    const steps  = [...slide.querySelectorAll('[data-anim="step"]')];
+    const arrows = [...slide.querySelectorAll('[data-anim="arrow"]')];
+    if(pipeStep >= steps.length - 1) return false;
+    pipeStep++;
+    animate(steps[pipeStep], {opacity:[0.15,1], y:[8,0]}, {duration:.5, easing:EASE});
+    if(pipeStep > 0 && arrows[pipeStep-1]){
+      animate(arrows[pipeStep-1], {opacity:[0.15,.7]}, {duration:.3, delay:.15});
+    }
+    return true;
+  }
+
+  window.__playSlide = playSlide;
+  window.__pipeAdvance = pipeAdvance;
+
+  playSlide(0);
+}
+</script>
+</body>
+</html>
