@@ -20,7 +20,7 @@
 
 1. # Nanobot
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/e6a0c0728207474484cd7bd8af5c3a99.png#pic_center =600x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/e6a0c0728207474484cd7bd8af5c3a99.png#pic_center=600x)
 
 
 
@@ -41,18 +41,18 @@ Agent puml类图
 
 1. ## Agent Loop 模块
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/c065940f62334248b303adea70685207.png#pic_center =600x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/c065940f62334248b303adea70685207.png#pic_center=600x)
 
 
 [一次llm api]: 普通的 AI 是你问一句它答一句，问答之间没有连续性。
 
 [一个agent 系统的API]: Agent Loop 不一样，你给它一个目标，它会自己反复思考、自己决定要不要用工具、用什么工具、看结果、再思考，一直循环到它认为任务完成为止。
 
-> ReAct 是 Agent Loop 的一种​**具体实现策略**​。ReAct = **Re**asoning + **Act**ing
+> ReAct 是 Agent Loop 的一种​**具体实现策略**​。ReAct= **Re**asoning + **Act**ing
 
 用户消息 → AgentLoop 分发 → Runner 执行思考 → 调用工具 → 再思考 → 结束应答
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/c946787bcb9f41a691d3427fbe4c70f1.png#pic_center =800x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/c946787bcb9f41a691d3427fbe4c70f1.png#pic_center=800x)
 
 
 ```Python
@@ -96,14 +96,14 @@ Agent puml类图
 ┌───────────────────────────────────────────────┐
 │  2. loop.py: run() [主循环]                                                   │
 │     while self._running:                                                     │
-│         msg = await self.bus.consume_inbound()    # 消费消息                  ｜
-│         task = asyncio.create_task(self._dispatch(msg))  # 分发为异步任务   │
+│         msg= await self.bus.consume_inbound()    # 消费消息                  ｜
+│         task= asyncio.create_task(self._dispatch(msg))  # 分发为异步任务   │
 └───────────────────────────────────────────────┘
 ↓
 ┌──────────────────────────────────────────────┐
 │  3. loop.py: _dispatch() [分发]                                              │
 │     ├─ async with lock, gate:     # 会话锁 + 并发控制                        │
-│     ├─ self._pending_queues[session_key] = pending  # 消息注入队列          │
+│     ├─ self._pending_queues[session_key]= pending  # 消息注入队列          │
 │     └─ await self._process_message(msg)                                      │
 └──────────────────────────────────────────────┘
 ↓
@@ -113,8 +113,8 @@ Agent puml类图
 │     ├─ auto_compact.prepare_session(session)     [2. 准备会话(归档状态)]    │
 │     ├─ commands.dispatch(ctx)                    [3. 斜杠命令处理]          │
 │     ├─ consolidator.maybe_consolidate_by_tokens  [4. token超限合并]         │
-│     ├─ history = session.get_history()           [5. 加载历史消息]          │
-│     ├─ messages = context.build_messages()       [6. 构建上下文, skill, memory]  │
+│     ├─ history= session.get_history()           [5. 加载历史消息]          │
+│     ├─ messages= context.build_messages()       [6. 构建上下文, skill, memory]  │
 │     ├─ await self._run_agent_loop()              [7. 执行Agent Loop循环 ]         │
 │     ├─ self._save_turn(session, all_msgs)        [8. 保存本轮对话]                │
 │     ├─ self.sessions.save(session)               [9. 持久化会话]            │
@@ -123,7 +123,7 @@ Agent puml类图
 ↓
 ┌──────────────────────────────────────────────┐
 │  5. context.py: build_messages() [构建上下文]                                │
-│     messages = [                                                              │
+│     messages= [                                                              │
 │         {"role": "system", "content": build_system_prompt()},  # 系统提示   │
 │         *history,                                              # 历史消息   │
 │         {"role": "user", "content": merged}                    # 当前消息   │
@@ -138,23 +138,23 @@ Agent puml类图
 ↓
 ┌──────────────────────────────────────────────┐
 │  6. loop.py: _run_agent_loop() [执行Agent]                                   │
-│     result = await self.runner.run(AgentRunSpec(...))                        │
+│     result= await self.runner.run(AgentRunSpec(...))                        │
 │     return (final_content, tools_used, messages, stop_reason)                │
 └───────────────────────────────────────────────┘
 ↓
 ┌──────────────────────────────────────────────┐
 │  7. runner.py: run() [LLM + 工具执行循环]                                    │
 │     for iteration in range(spec.max_iterations):  # 核心设计: for循环       │
-│         ├─ messages_for_model = self._apply_tool_result_budget(...)         │
-│         ├─ response = await self._request_model(...)    # 调用LLM           │
+│         ├─ messages_for_model= self._apply_tool_result_budget(...)         │
+│         ├─ response= await self._request_model(...)    # 调用LLM           │
 │         │                                                                       │
 │         │   if response.has_tool_calls:             # 有工具调用            │
-│         │       ├─ results = await self._execute_tools(...)                  │
+│         │       ├─ results= await self._execute_tools(...)                  │
 │         │       ├─ messages.append(tool_message)    # 工具结果               │
 │         │       └─ continue                         # 继续下一轮             │
 │         │                                                                       │
 │         │   # 无工具调用 → 结束                                               │
-│         │   final_content = clean                                              │
+│         │   final_content= clean                                              │
 │         │   break                                                              │
 │         │                                                                       │
 │     return AgentRunResult(...)                                                │
@@ -504,20 +504,20 @@ metadata: {"nanobot":{"always": true, "requires":{"bins":["python"],"env":["API_
 
 ```python
 def build_system_prompt(self) -> str:
-    parts = []
+    parts= []
 
     # 1-2. Bootstrap files + Memory
     parts.append(self._load_bootstrap_files())
     parts.append(self.memory.get_memory_context())
 
     # 3. Always Skills - 完整加载
-    always_skills = self.skills.get_always_skills()           # → ['audit_cw08']
+    always_skills= self.skills.get_always_skills()           # → ['audit_cw08']
     if always_skills:
-        content = self.skills.load_skills_for_context(always_skills)  # 去除 frontmatter
+        content= self.skills.load_skills_for_context(always_skills)  # 去除 frontmatter
         parts.append(f"# Active Skills\n\n{content}")
 
     # 4. Skills Summary - XML 摘要
-    summary = self.skills.build_skills_summary()
+    summary= self.skills.build_skills_summary()
     parts.append(summary)  # <skills><skill name="..."/></skills>
 
     return "\n\n---\n\n".join(parts)
@@ -596,8 +596,8 @@ cron.py, filesystem.py, mcp.py, message.py, notebook.py,
 price_internet.py, search.py, shell.py, spawn.py,  web.py
 ```
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/6f8a6dada15c46fcaa61d91913479baf.png#pic_center =600x)
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/b224cd29e7ec4f5a85638168837cbf01.png#pic_center =1000x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/6f8a6dada15c46fcaa61d91913479baf.png#pic_center=600x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/b224cd29e7ec4f5a85638168837cbf01.png#pic_center=1000x)
 
 
 1. ### 工具注册和调用的时机
@@ -616,7 +616,7 @@ __init__()
         # ToolRegistry: get_definitions
         # 就是把 Tool 对象转换为 OpenAI Function Calling API 兼容的 JSON 格式：
         # 这个格式可以直接传给 OpenAI API 的 tools 参数，让 LLM 知道有哪些工具可用以及如何调用它们。
-        definitions = [tool.to_schema() for tool in self._tools.values()]
+        definitions= [tool.to_schema() for tool in self._tools.values()]
 ```
 
 2. ### 如何添加一个自己的工具
@@ -667,7 +667,7 @@ StringSchema 是用来描述字符串参数的约束条件
 
 ```Python
 # 用于工具注册和执行
-# DSL = Domain Specific Language（领域特定语言）
+# DSL= Domain Specific Language（领域特定语言）
  本质就是用 Python DSL 替代手写 JSON Schema，开发体验更好。
 StringSchema("物料编号", min_length=1)
 # 等价于直接写领域原始格式（JSON Schema dict）
@@ -740,18 +740,18 @@ def tool_parameters(schema: dict[str, Any]) -> Callable[[type[_ToolT]], type[_To
     """
 
     def decorator(cls: type[_ToolT]) -> type[_ToolT]:
-        frozen = deepcopy(schema)
+        frozen= deepcopy(schema)
 
         @property
         def parameters(self: Any) -> dict[str, Any]:
             return deepcopy(frozen)
 
-        cls._tool_parameters_schema = deepcopy(frozen)
-        cls.parameters = parameters  # type: ignore[assignment]
+        cls._tool_parameters_schema= deepcopy(frozen)
+        cls.parameters= parameters  # type: ignore[assignment]
 
-        abstract = getattr(cls, "__abstractmethods__", None)
+        abstract= getattr(cls, "__abstractmethods__", None)
         if abstract is not None and "parameters" in abstract:
-            cls.__abstractmethods__ = frozenset(abstract - {"parameters"})  # type: ignore[misc]
+            cls.__abstractmethods__= frozenset(abstract - {"parameters"})  # type: ignore[misc]
 
         return cls
 
@@ -796,7 +796,7 @@ maybe_consolidate_by_tokens(session)                        # 【核心】循环
 
 1. #### **Consolidator 方法之间的关系**
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/943e483632414d15946dfc6a11248ec6.png#pic_center =600x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/943e483632414d15946dfc6a11248ec6.png#pic_center=600x)
 
 
 ```Plain
@@ -804,8 +804,8 @@ maybe_consolidate_by_tokens(session)                        # 【核心】循环
 maybe_consolidate_by_tokens(session)                     # 【核心】循环压缩直到符合 token 预算
     │
     ├─ 1. 计算预算
-    │      budget = context_window - max_completion - SAFETY_BUFFER
-    │      target = budget // 2  # 目标：降到预算的一半
+    │      budget= context_window - max_completion - SAFETY_BUFFER
+    │      target= budget // 2  # 目标：降到预算的一半
     │
     ├─ 2. 估算当前 token
     │      estimate_session_prompt_tokens(session) → (estimated, source)
@@ -825,20 +825,20 @@ maybe_consolidate_by_tokens(session)                     # 【核心】循环压
             │     → 成功：写入 history.jsonl
             │     → 失败：raw_archive 原始 dump
             │
-            ├─ session.last_consolidated = end_idx  # 更新游标
+            ├─ session.last_consolidated= end_idx  # 更新游标
             │
             └─ 重新估算 token，继续下一轮
 
 关键补充：
 
-1. target 是预算的一半：target = budget // 2，不是刚好降到 budget
+1. target 是预算的一半：target= budget // 2，不是刚好降到 budget
 2. 循环最多 5 轮：防止无限压缩
 3. _cap 是对 end_idx 的二次限制：先选边界，再限制大小
 ```
 
 2. #### **Consolidator ​**压缩过程
 
-![外链图片转存失败,源站可能有防盗链机制,建议将图片保存下来直接上传](https://i-blog.csdnimg.cn/direct/96fc394d708a4746b04fe02675e1cf31.png#pic_center =900x)
+![外链图片转存失败,源站可能有防盗链机制,建议将图片保存下来直接上传](https://i-blog.csdnimg.cn/direct/96fc394d708a4746b04fe02675e1cf31.png#pic_center=900x)
 
 
 ```Python
@@ -847,8 +847,8 @@ budget                     # 输入消息的安全上限，表示 prompt 可以�
 self.context_window_tokens # LLM 模型的最大上下文容量（输入+输出）
 self.max_completion_tokens # 为 LLM 响应输出预留的 token 空间
 self._SAFETY_BUFFER        # tokenizer 估算误差的缓冲 容错
-budget = self.context_window_tokens - self.max_completion_tokens - self._SAFETY_BUFFER 
-estimated, source = self.estimate_session_prompt_tokens(session)     # 已经用了多少token
+budget= self.context_window_tokens - self.max_completion_tokens - self._SAFETY_BUFFER 
+estimated, source= self.estimate_session_prompt_tokens(session)     # 已经用了多少token
 estimated 是"用了多少"，budget 是"能用多少"。用了 < 能用 → 安全，继续。
 
 # 压缩 样例
@@ -858,18 +858,18 @@ estimated 是"用了多少"，budget 是"能用多少"。用了 < 能用 → 安
 3. 最多 60 条消息上限
 # Token 预算计算
 
-budget = context_window_tokens - max_completion_tokens - SAFETY_BUFFER
-# 示例：65536 - 8192 - 1024 = 56320
+budget= context_window_tokens - max_completion_tokens - SAFETY_BUFFER
+# 示例：65536 - 8192 - 1024= 56320
 
-estimated = 当前 session 已用 token
+estimated= 当前 session 已用 token
 
 # 触发条件
 if estimated > budget:
-    target = budget * 0.5  # 目标：降到预算的 50%
-    need_remove = estimated - target  # 需移除的量
+    target= budget * 0.5  # 目标：降到预算的 50%
+    need_remove= estimated - target  # 需移除的量
 
 # 边界选择
-boundary = pick_consolidation_boundary(session, need_remove)
+boundary= pick_consolidation_boundary(session, need_remove)
 # 返回：(end_idx, removed_tokens) -> (截断的消息索引位置, 该位置累计移除的 token 数)
 # 约束：用户消息完整性 + 最多 60 条上限
 
@@ -895,7 +895,7 @@ archive(chunk)  # 若返回 nothing → 无价值内容，跳过
 
 1. ### history.jsonl 的写入时机和来源
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/ae8f51cf6b514498b8374fc15d8a740f.png#pic_center =900x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/ae8f51cf6b514498b8374fc15d8a740f.png#pic_center=900x)
 
 
 ```YAML
@@ -918,7 +918,7 @@ estimated > budget?
   ├─ No → 直接返回（不写入 history.jsonl）
   └─ Yes → 循环压缩
       ↓
-      截取 chunk = session.messages[last_consolidated:end_idx]
+      截取 chunk= session.messages[last_consolidated:end_idx]
       ↓
       Consolidator.archive(chunk)
       ├─ 格式化 messages → MemoryStore._format_messages()
@@ -933,7 +933,7 @@ estimated > budget?
 CommandRouter.dispatch(ctx)
   ↓
 cmd_new(ctx)
-  ├─ snapshot = session.messages[last_consolidated:]  ⭐ 提取未压缩部分
+  ├─ snapshot= session.messages[last_consolidated:]  ⭐ 提取未压缩部分
   ├─ session.clear()                                 ⭐ 清空会话
   └─ loop._schedule_background(consolidator.archive(snapshot))  ⭐ 后台归档
       ↓
@@ -966,7 +966,7 @@ dream_phase1.md， dream_phase2.md  这两个文件的区别和作用
 第一个负责"想清楚该改什么"，第二个负责"真正动手改文件"
 ```
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/67555b2cc3af415c857eedc6c6159311.png#pic_center =600x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/67555b2cc3af415c857eedc6c6159311.png#pic_center=600x)
 
 
 ```SQL
@@ -1103,7 +1103,7 @@ MEMORY 业务知识库（技术知识、项目相关背景）
 
 6. ## Subagent
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/5d8d5137f7c94cfba55d4573c3075f0c.png#pic_center =600x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/5d8d5137f7c94cfba55d4573c3075f0c.png#pic_center=600x)
 
 
 类关系
@@ -1118,7 +1118,7 @@ SubagentManager，AgentRunner 组合关系
     AgentRunner 为 SubAgentManager类的成员属性
 ```
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/fe8dd0d959ab411a919479445998a6d1.png#pic_center =900x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/fe8dd0d959ab411a919479445998a6d1.png#pic_center=900x)
 
 
 关键部分
@@ -1180,7 +1180,7 @@ spawn的工具描述
 
 7. ## Bus的用法
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/9a82887fbe0a43878e73d36bc0d25634.png#pic_center =600x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/9a82887fbe0a43878e73d36bc0d25634.png#pic_center=600x)
 
 
 bus负责处理信息队列和事件。 events定义事件，`nanobot/bus/events.py`，即从聊天渠道获得的信息和要返回到聊天界面的信息，就是个结构体。
@@ -1224,12 +1224,12 @@ bus负责处理信息队列和事件。 events定义事件，`nanobot/bus/events
 # 消费消息
 # 拿消息进行消费，最多1s，无消息则continue 防止阻塞
 AgentLoop: run()
-msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)
+msg= await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)
 ```
 
 2. ### bus并发控制
 
-![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/376fb8c0206742958fd500f3fb3336a2.png#pic_center =900x)
+![在这里插入图片描述](https://i-blog.csdnimg.cn/direct/376fb8c0206742958fd500f3fb3336a2.png#pic_center=900x)
 
 
 2. # 工具分享
@@ -1266,7 +1266,7 @@ GitHub 地址：https://github.com/farion1231/cc-switch
 
 CC Switch 是一个跨平台桌面端的 All-in-One 工具，支持管理 Claude Code、Codex、OpenCode、OpenClaw、Gemini CLI 和 Hermes Agent 等多个 AI 编程 CLI 工具。
 
-![外链图片转存失败,源站可能有防盗链机制,建议将图片保存下来直接上传](https://i-blog.csdnimg.cn/direct/4417d33b5d0246feab015b222e2dd30c.png#pic_center =800x)
+![外链图片转存失败,源站可能有防盗链机制,建议将图片保存下来直接上传](https://i-blog.csdnimg.cn/direct/4417d33b5d0246feab015b222e2dd30c.png#pic_center=800x)
 
 
 2. ### 核心功能
