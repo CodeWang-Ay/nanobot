@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nanobot 核心原理解读及工具分享</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --accent-color: #0066cc;
+            --secondary-color: #f5f5f5;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .slide-container {
+            display: flex;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            scroll-behavior: smooth;
+        }
+
+        .slide {
+            min-width: 100vw;
+            height: 100vh;
+            padding: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .slide-content {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--accent-color);
+        }
+
+        h2 {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--text-color);
+        }
+
+        h3 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+            color: var(--text-color);
+        }
+
+        .subtitle {
+            font-size: 2rem;
+            color: #666;
+            margin-top: -1rem;
+            margin-bottom: 3rem;
+        }
+
+        .accent {
+            color: var(--accent-color);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .card {
+            background: var(--secondary-color);
+            padding: 1.5rem;
+            border-radius: 0;
+        }
+
+        .card h4 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent-color);
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 1.5rem;
+            border-radius: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+
+        .flow-diagram {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            background: var(--secondary-color);
+            padding: 1rem;
+            white-space: pre;
+            line-height: 1.4;
+        }
+
+        .highlight-box {
+            background: var(--accent-color);
+            color: white;
+            padding: 1rem 2rem;
+            margin: 1rem 0;
+        }
+
+        .number {
+            font-size: 6rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            opacity: 0.3;
+        }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: var(--accent-color);
+            transition: width 0.6s ease;
+        }
+
+        .slide-number {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .nav-hint {
+            position: fixed;
+            bottom: 1rem;
+            left: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        ul {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin: 1rem 0;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+
+        th, td {
+            padding: 1rem;
+            border-bottom: 2px solid var(--accent-color);
+            font-size: 1rem;
+        }
+
+        th {
+            background: var(--accent-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        .emoji {
+            font-size: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 3rem; }
+            h2 { font-size: 2rem; }
+            .grid, .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progress"></div>
+    <div class="slide-number" id="slideNum">01 / 11</div>
+    <div class="nav-hint">← → 键盘导航 | 触摸滑动</div>
+
+    <div class="slide-container" id="slides">
+        <!-- Slide 1: 封面 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h1>nanobot</h1>
+                <p class="subtitle">核心原理解读及工具分享</p>
+                <div class="grid">
+                    <div class="card">
+                        <h4><span class="emoji">🧠</span> 核心源码解读</h4>
+                        <p>AgentLoop、Skills加载、工具注册<br>Memory机制、Subagent</p>
+                    </div>
+                    <div class="card">
+                        <h4><span class="emoji">🔧</span> 工具分享</h4>
+                        <p>guizang-ppt-skill<br>CC Switch、Claude Code Router</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: 整体架构 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>整体架构</h2>
+                <div class="grid grid-3">
+                    <div class="card">
+                        <h4>AgentLoop</h4>
+                        <p>消息分发<br>Runner 执行<br>工具调用循环</p>
+                    </div>
+                    <div class="card">
+                        <h4>Skills加载</h4>
+                        <p>元数据注入<br>按需加载<br>Always Skills</p>
+                    </div>
+                    <div class="card">
+                        <h4>工具注册</h4>
+                        <p>ToolRegistry<br>Schema DSL<br>Function Calling</p>
+                    </div>
+                    <div class="card">
+                        <h4>Memory机制</h4>
+                        <p>Consolidator<br>Dream<br>三层记忆</p>
+                    </div>
+                    <div class="card">
+                        <h4>Subagent</h4>
+                        <p>后台任务<br>SpawnTool<br>异步执行</p>
+                    </div>
+                    <div class="card">
+                        <h4>Bus</h4>
+                        <p>MessageBus<br>Inbound/Outbound<br>队列管理</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: Agent Loop -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Agent Loop 模块</h2>
+                <div class="highlight-box">
+                    ReAct = Reasoning + Acting<br>
+                    自己反复思考 → 决定工具 → 执行 → 再思考 → 完成
+                </div>
+                <div class="flow-diagram">
+用户消息 → AgentLoop 分发 → Runner 执行思考 → 调用工具 → 再思考 → 结束应答
+
+for iteration in range(max_iterations):
+    ├─ _request_model()     ← 调 LLM
+    ├─ 有 tool_calls？
+    │     ├─ YES → 执行 → append → continue
+    │     └─ NO  → break
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Skills 加载机制 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Skills 加载机制</h2>
+                <div class="grid">
+                    <div>
+                        <h3>加载级别</h3>
+                        <table>
+                            <tr><th>级别</th><th>时机</th><th>Token成本</th></tr>
+                            <tr><td>第一级：元数据</td><td>启动时</td><td>≈100 tokens</td></tr>
+                            <tr><td>第二级：指令</td><td>触发时</td><td>≤5k tokens</td></tr>
+                            <tr><td>第三级：资源</td><td>按需</td><td>无限制</td></tr>
+                        </table>
+                    </div>
+                    <div>
+                        <h3>两种模式</h3>
+                        <div class="card">
+                            <h4>Always Skills</h4>
+                            <p>完整加载到 system_prompt<br>metadata.always=true</p>
+                        </div>
+                        <div class="card">
+                            <h4>普通 Skills</h4>
+                            <p>XML摘要注入<br>按需 read_file 加载</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: 工具注册 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>工具注册与调用</h2>
+                <div class="grid">
+                    <div>
+                        <h3>ToolRegistry</h3>
+                        <p>核心类管理工具注册<br>self._tools[key: value]<br>工具名称 → Tool对象</p>
+                        <div class="code-block">
+ToolRegistry.get_definitions()
+    └─ definitions = [
+         tool.to_schema()
+         for tool in self._tools.values()
+       ]
+                        </div>
+                    </div>
+                    <div>
+                        <h3>工具开发</h3>
+                        <div class="code-block">
+@tool_parameters(
+    tool_parameters_schema(
+        path=StringSchema("文件路径", min_length=1),
+        required=["path"]
+    )
+)
+class MyTool(Tool):
+    @property
+    def name(self) -> str:
+        return "my_tool"
+
+    async def execute(self, path: str) -> str:
+        return "结果"
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Memory 机制 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Memory 三层机制</h2>
+                <div class="grid grid-3">
+                    <div class="card">
+                        <h4><span class="emoji">💾</span> MemoryStore</h4>
+                        <p>history.jsonl<br>每次对话写入<br>append-only</p>
+                    </div>
+                    <div class="card">
+                        <h4><span class="emoji">🗜️</span> Consolidator</h4>
+                        <p>Token超限触发<br>LLM摘要压缩<br>降到预算50%</p>
+                    </div>
+                    <div class="card">
+                        <h4><span class="emoji">🌙</span> Dream</h4>
+                        <p>定时任务(2小时)<br>Phase1: 分析<br>Phase2: 执行</p>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    budget = context_window - max_completion - SAFETY_BUFFER<br>
+                    target = budget // 2 (目标降到一半)
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Subagent -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Subagent 后台任务</h2>
+                <div class="flow-diagram">
+SpawnTool.execute()
+└─→ SubagentManager.spawn()
+        └─→ asyncio.create_task(_run_subagent())
+            ├─ ToolRegistry 注册工具（不含 spawn/message）
+            ├─ _build_subagent_prompt()
+            ├─ AgentRunner.run()
+            └─ _announce_result() → MessageBus 通知主 agent
+                </div>
+                <div class="grid">
+                    <div class="card">
+                        <h4>关键特性</h4>
+                        <ul>
+                            <li>非阻塞：立即返回</li>
+                            <li>后台独立运行</li>
+                            <li>完成后通知主agent</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h4>设计限制</h4>
+                        <ul>
+                            <li>单层派生（不可嵌套）</li>
+                            <li>无spawn/message工具</li>
+                            <li>避免任务树爆炸</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: guizang-ppt-skill -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>guizang-ppt-skill</h2>
+                <p class="subtitle">生成精美HTML演示文稿</p>
+                <div class="grid">
+                    <div class="card">
+                        <h4>核心价值</h4>
+                        <p>把演讲者踩坑后的审美标准、布局规范、质量检查清单全部编码进去</p>
+                        <p>达到"编辑级"视觉水准<br>而非"商务模板"风格</p>
+                    </div>
+                    <div class="card">
+                        <h4>两套视觉系统</h4>
+                        <p><strong>Style A</strong><br>电子杂志 × 电子墨水<br>适合叙事、观点、分享</p>
+                        <p><strong>Style B</strong><br>瑞士国际主义风格<br>适合数据、产品、分析</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: CC Switch -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>CC Switch</h2>
+                <p class="subtitle">All-in-One AI编程CLI管理工具</p>
+                <table>
+                    <tr><th>功能</th><th>说明</th></tr>
+                    <tr><td>六个CLI工具</td><td>Claude Code, Codex, Gemini CLI, OpenCode, OpenClaw, Hermes</td></tr>
+                    <tr><td>50+供应商预设</td><td>AWS Bedrock, NVIDIA NIM, 社区中转服务</td></tr>
+                    <tr><td>一键切换</td><td>可视化界面，不同供应商切换</td></tr>
+                    <tr><td>统一MCP/Skills管理</td><td>一个面板管理四个应用</td></tr>
+                    <tr><td>路由模式（核心）</td><td>让Claude Code使用OpenAI兼容API</td></tr>
+                    <tr><td>热更新</td><td>切换后立即生效</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Slide 10: Claude Code Router -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Claude Code Router</h2>
+                <p class="subtitle">开源路由工具，灵活切换模型</p>
+                <div class="grid">
+                    <div class="card">
+                        <h4>核心功能</h4>
+                        <ul>
+                            <li>多模型路由</li>
+                            <li>请求转发（OpenAI格式）</li>
+                            <li>统一认证</li>
+                            <li>Web管理界面</li>
+                            <li>完整日志记录</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h4>使用场景</h4>
+                        <ul>
+                            <li>本地部署LLM（vLLM、Ollama）</li>
+                            <li>接入国内大模型服务</li>
+                            <li>多模型负载均衡</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="code-block">
+npm install -g @musistudio/claude-code-router
+ccr code          # 启动
+ccr restart       # 重启生效
+ccr ui            # Web界面
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 11: 结束页 -->
+        <div class="slide">
+            <div class="slide-content" style="text-align: center;">
+                <h1>谢谢</h1>
+                <p class="subtitle">nanobot 核心原理解读及工具分享</p>
+                <div style="margin-top: 3rem;">
+                    <p><span class="accent">参考资料</span></p>
+                    <p>GitHub: https://github.com/HKUDS/nanobot</p>
+                    <p>文档: https://nanobot.wiki</p>
+                    <p>社区: Discord & Feishu & WeChat</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const progress = document.getElementById('progress');
+        const slideNum = document.getElementById('slideNum');
+
+        function updateProgress() {
+            const progressWidth = ((currentSlide + 1) / totalSlides) * 100;
+            progress.style.width = progressWidth + '%';
+            slideNum.textContent = `${String(currentSlide + 1).padStart(2, '0')} / ${String(totalSlides).padStart(2, '0')}`;
+        }
+
+        function goToSlide(index) {
+            if (index < 0) index = 0;
+            if (index >= totalSlides) index = totalSlides - 1;
+            currentSlide = index;
+            document.getElementById('slides').style.transform =
+                `translateX(-${currentSlide * 100}vw)`;
+            updateProgress();
+        }
+
+        // 初始化进度条
+        updateProgress();
+
+        // 键盘导航
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                goToSlide(currentSlide + 1);
+            }
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                goToSlide(currentSlide - 1);
+            }
+            if (e.key === 'Home') {
+                e.preventDefault();
+                goToSlide(0);
+            }
+            if (e.key === 'End') {
+                e.preventDefault();
+                goToSlide(totalSlides - 1);
+            }
+        });
+
+        // 触摸滑动
+        let startX = 0;
+        let startY = 0;
+        let isSwiping = false;
+
+        document.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            isSwiping = true;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            if (!isSwiping) return;
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+
+            // 只有横向滑动才切换幻灯片（横向距离大于纵向距离）
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    goToSlide(currentSlide + 1);
+                } else {
+                    goToSlide(currentSlide - 1);
+                }
+            }
+            isSwiping = false;
+        });
+
+        // 防止触摸过程中的滚动
+        document.addEventListener('touchmove', (e) => {
+            if (isSwiping) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // 添加点击导航（可选）
+        document.addEventListener('click', (e) => {
+            const clickX = e.clientX;
+            const screenWidth = window.innerWidth;
+
+            // 点击屏幕右侧1/3区域前进
+            if (clickX > screenWidth * 2/3) {
+                goToSlide(currentSlide + 1);
+            }
+            // 点击屏幕左侧1/3区域后退
+            else if (clickX < screenWidth / 3) {
+                goToSlide(currentSlide - 1);
+            }
+        });
+    </script>
+</body>
+</html>
